@@ -9,6 +9,7 @@ import { listNavItems, listNavPages, type PublicNavItem } from "@/lib/content/pu
 import { getSettings } from "@/lib/settings";
 import { fontClassNames } from "./fonts";
 import { Logo } from "./Logo";
+import { resolveLogoOverrides } from "./logo-overrides";
 import { SiteNav, type NavLinkItem } from "./SiteNav";
 import { SiteFooter } from "./SiteFooter";
 
@@ -21,11 +22,12 @@ const toLink = (n: PublicNavItem): NavLinkItem => ({
 });
 
 export async function SiteShell({ children }: { children: ReactNode }) {
-  const [header, footerPrimary, footerLegal, settings] = await Promise.all([
+  const [header, footerPrimary, footerLegal, settings, logos] = await Promise.all([
     listNavItems("HEADER"),
     listNavItems("FOOTER_PRIMARY"),
     listNavItems("FOOTER_LEGAL"),
     getSettings(),
+    resolveLogoOverrides(),
   ]);
   let headerItems: NavLinkItem[] = header.map(toLink);
   if (headerItems.length === 0) {
@@ -40,10 +42,10 @@ export async function SiteShell({ children }: { children: ReactNode }) {
       <header className="site-header">
         <div className="wrap flex h-[4.5rem] items-center justify-between gap-6 min-[1180px]:h-24">
           <Link href="/" aria-label="BatiNova Construction — accueil" className="flex-none">
-            <Logo variant="color" priority className="w-[8.75rem] min-[1180px]:w-[11rem]" />
+            <Logo variant="color" priority overrides={logos} className="w-[8.75rem] min-[1180px]:w-[11rem]" />
           </Link>
           <div className="flex items-center gap-8 xl:gap-12">
-            <SiteNav items={headerItems} ctaHref="/devis" ctaLabel="Demander un devis" />
+            <SiteNav items={headerItems} ctaHref="/devis" ctaLabel="Demander un devis" logos={logos} />
           </div>
         </div>
       </header>
@@ -54,6 +56,7 @@ export async function SiteShell({ children }: { children: ReactNode }) {
         primary={footerPrimary.map(toLink)}
         legal={footerLegal.map(toLink)}
         settings={settings}
+        logos={logos}
       />
     </div>
   );

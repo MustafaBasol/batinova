@@ -126,3 +126,31 @@ describe("crop, focal point, replace, delete", () => {
     expect(u).toMatchObject({ alt: "Cuisine ouverte", licenseType: "STOCK_FREE", isPlaceholder: true });
   });
 });
+
+describe("/media route and soft-deleted media", () => {
+  it("returns 404 (no-store) for master and variants of trashed media, and serves them again after restore", async () => {
+    const { GET } = await import("@/app/media/[...key]/route");
+    const m = await createMediaFromBuffer({ ...base, buffer: await photo(900, 500), originalName: "a.jpg" });
+    const keys = [m.storageKey, ...(m.variants as { key: string }[]).map((v) => v.key)];
+    const call = (k: string) => GET(new Request("https://btnv.fr/media/x"), { params: Promise.resolve({ key: k.split("/") }) });
+
+    for (const k of keys) {
+      const ok = await call(k);
+      expect(ok.status).toBe(200);
+      expect(ok.headers.get("cache-control")).toContain("immutable");
+      await ok.body?.cancel();
+    }
+    await softDeleteMedia(m.id, null);
+    for (const k of keys) {
+      const res = await call(k);
+      expect(res.status).toBe(404);
+      expect(res.headers.get("cache-control")).toBe("no-store");
+    }
+    await restoreMedia(m.id, null);
+    for (const k of keys) {
+      const res = await call(k);
+      expect(res.status).toBe(200);
+      await res.body?.cancel();
+    }
+  });
+});

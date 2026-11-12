@@ -68,6 +68,7 @@ describe("authorization on every action", () => {
     ["saveRedirectAction", () => content.saveRedirectAction({ fromPath: "/a", toPath: "/b", statusCode: 301 })],
     ["updateMediaAction", () => mediaActions.updateMediaAction({})],
     ["setLeadStatusAction", () => leadActions.setLeadStatusAction({})],
+    ["purgeExpiredLeadsAction", () => leadActions.purgeExpiredLeadsAction()],
     ["purgeAction", () => content.purgeAction("page", "x")],
     ["saveSettingsAction", () => adminActions.saveSettingsAction("mail", { enabled: true })],
     ["createUserAction", () => adminActions.createUserAction({})],
@@ -87,6 +88,7 @@ describe("authorization on every action", () => {
     ["resetPasswordAction", () => adminActions.resetPasswordAction({})],
     ["anonymiseLeadAction", () => leadActions.anonymiseLeadAction("x")],
     ["deleteLeadAction", () => leadActions.deleteLeadAction("x")],
+    ["purgeExpiredLeadsAction", () => leadActions.purgeExpiredLeadsAction()],
   ];
 
   it.each(ownerOnly)("%s refuses an EDITOR", async (_n, fn) => {
@@ -532,6 +534,24 @@ describe("leads and settings", () => {
     expect(await getPrivateStorage().exists(key)).toBe(false);
     expect((await leadActions.deleteLeadAction(lead.id)).ok).toBe(true);
     expect(await db.lead.count()).toBe(0);
+  });
+
+  it("purgeExpiredLeadsAction: EDITOR cannot purge; OWNER purges only expired leads, reports the count and audits", async () => {
+    const mk = (email: string, retentionUntil: Date) =>
+      db.lead.create({ data: { name: "N", email, projectType: "extension", message: "Bonjour, projet.", postalCode: "93600", consentAt: new Date(), consentTextVersion: "t", retentionUntil } as never });
+    const expired = await mk("old@example.test", new Date(Date.now() - HOUR));
+    const fresh = await mk("new@example.test", new Date(Date.now() + 30 * 24 * HOUR));
+    await loginAs("EDITOR");
+    await expect(leadActions.purgeExpiredLeadsAction()).rejects.toThrow("REDIRECT:/admin?refus=1");
+    expect(await db.lead.count()).toBe(2);
+    await loginAs("OWNER");
+    const r = await leadActions.purgeExpiredLeadsAction();
+    expect(r.ok).toBe(true);
+    expect(r.ok && r.data?.leads).toBe(1);
+    expect(r.ok && r.message).toContain("1 demande");
+    expect(await db.lead.findUnique({ where: { id: expired.id } })).toBeNull();
+    expect(await db.lead.findUnique({ where: { id: fresh.id } })).not.toBeNull();
+    expect(await db.auditLog.count({ where: { action: "maintenance.purge" } })).toBe(1);
   });
 
   it("settings: OWNER saves validated groups; invalid values and unknown keys are refused", async () => {

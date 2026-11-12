@@ -3,6 +3,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/guards";
+import { Logo } from "@/components/site/Logo";
 import { LoginForm } from "./LoginForm";
 
 export const metadata: Metadata = {
@@ -20,11 +21,19 @@ export default async function LoginPage({
   const next = typeof sp.next === "string" ? sp.next : undefined;
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-offwhite px-4">
-      <div className="w-full max-w-sm bg-white border border-beige/40 p-8">
-        <h1 className="font-serif text-2xl text-charcoal mb-1">BatiNova</h1>
-        <p className="text-sm text-charcoal/70 mb-6">Espace d’administration</p>
-        <LoginForm next={next} />
+    <main className="flex min-h-screen items-center justify-center bg-offwhite px-4 py-12">
+      <div className="w-full max-w-md">
+        <div className="mb-8 flex justify-center">
+          <Logo variant="color" priority className="w-[13rem]" />
+        </div>
+        <div className="border border-beige/50 bg-white p-8 shadow-sm sm:p-10">
+          <h1 className="font-serif text-2xl text-charcoal">Espace d’administration</h1>
+          <p className="mb-8 mt-2 text-sm leading-relaxed text-charcoal/75">
+            Connectez-vous avec votre compte pour gérer le contenu du site.
+          </p>
+          <LoginForm next={next} />
+        </div>
+        <p className="mt-6 text-center text-xs text-charcoal/65">Accès réservé aux membres autorisés de l’équipe.</p>
       </div>
     </main>
   );

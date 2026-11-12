@@ -11,7 +11,7 @@ export function LoginForm({ next }: { next?: string }) {
     <form action={action} className="space-y-4" noValidate>
       {next ? <input type="hidden" name="next" value={next} /> : null}
       <div>
-        <label htmlFor="email" className="block text-sm text-charcoal mb-1">
+        <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-charcoal">
           Adresse e-mail
         </label>
         <input
@@ -20,12 +20,13 @@ export function LoginForm({ next }: { next?: string }) {
           type="email"
           autoComplete="username"
           required
+          aria-describedby={state.error ? "login-error" : undefined}
           maxLength={254}
-          className="w-full border border-charcoal/30 px-3 py-2 focus:outline-2 focus:outline-beige"
+          className="min-h-11 w-full border border-charcoal/40 bg-white px-3 py-2 text-charcoal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-charcoal"
         />
       </div>
       <div>
-        <label htmlFor="password" className="block text-sm text-charcoal mb-1">
+        <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-charcoal">
           Mot de passe
         </label>
         <input
@@ -35,12 +36,12 @@ export function LoginForm({ next }: { next?: string }) {
           autoComplete="current-password"
           required
           maxLength={256}
-          className="w-full border border-charcoal/30 px-3 py-2 focus:outline-2 focus:outline-beige"
+          className="min-h-11 w-full border border-charcoal/40 bg-white px-3 py-2 text-charcoal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-charcoal"
         />
       </div>
-      <div aria-live="polite" className="min-h-5">
+      <div aria-live="polite" className="min-h-6">
         {state.error ? (
-          <p role="alert" className="text-sm text-red-700">
+          <p id="login-error" role="alert" className="border-l-2 border-red-700 bg-red-50 px-3 py-2 text-sm text-red-800">
             {state.error}
           </p>
         ) : null}
@@ -48,7 +49,7 @@ export function LoginForm({ next }: { next?: string }) {
       <button
         type="submit"
         disabled={pending}
-        className="w-full bg-charcoal text-offwhite py-2 hover:bg-charcoal/90 disabled:opacity-60"
+        className="min-h-11 w-full bg-charcoal py-2 text-sm font-medium uppercase tracking-[0.14em] text-offwhite hover:bg-charcoal/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-charcoal disabled:opacity-60"
       >
         {pending ? "Connexion…" : "Se connecter"}
       </button>

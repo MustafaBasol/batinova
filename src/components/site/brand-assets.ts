@@ -19,7 +19,17 @@ export interface LogoFile {
   png: Img;
 }
 
-export const LOGO_ALT = "BatiNova Construction";
+/** Admin-uploaded logo (settings.branding.*MediaId) resolved server-side; see ./logo-overrides.ts. */
+export interface LogoOverride {
+  src: string;
+  width: number;
+  height: number;
+  avif: { src: string; width: number }[];
+  webp: { src: string; width: number }[];
+}
+export type LogoOverrides = Partial<Record<LogoVariant, LogoOverride>>;
+
+export const LOGO_ALT ="BatiNova Construction";
 
 export const LOGOS: Record<LogoVariant, LogoFile> = {
   color: {

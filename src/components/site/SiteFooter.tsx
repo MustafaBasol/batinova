@@ -6,9 +6,10 @@ import Link from "next/link";
 import { SITE, SERVICE_AREAS } from "@/lib/config/site";
 import { isVerified, type SiteSettings } from "@/lib/settings-schema";
 import { Logo } from "./Logo";
+import type { LogoOverrides } from "./brand-assets";
 import type { NavLinkItem } from "./SiteNav";
 
-export function SiteFooter({ primary, legal, settings }: { primary: NavLinkItem[]; legal: NavLinkItem[]; settings: SiteSettings }) {
+export function SiteFooter({ primary, legal, settings, logos }: { primary: NavLinkItem[]; legal: NavLinkItem[]; settings: SiteSettings; logos?: LogoOverrides }) {
   const a = settings.address;
   const phone = isVerified(settings.company.phone) ? settings.company.phone.value : null;
   const email = isVerified(settings.company.publicEmail)
@@ -23,7 +24,7 @@ export function SiteFooter({ primary, legal, settings }: { primary: NavLinkItem[
       <div className="wrap section-tight pb-10">
         <div className="grid gap-12 border-b border-offwhite/20 pb-14 lg:grid-cols-12">
           <div className="lg:col-span-5">
-            <Logo variant="onDark" className="w-[11rem]" />
+            <Logo variant="onDark" overrides={logos} className="w-[11rem]" />
             <p className="display mt-8 text-[clamp(2rem,4vw,3rem)] text-offwhite">{SITE.slogan}</p>
             <Link href="/devis" className="btn btn-beige mt-8">
               Demander un devis

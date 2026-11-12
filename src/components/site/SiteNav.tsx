@@ -9,6 +9,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Logo } from "./Logo";
+import type { LogoOverrides } from "./brand-assets";
 
 export interface NavLinkItem {
   id: string;
@@ -28,7 +29,7 @@ function isCurrent(pathname: string, href: string) {
   return pathname === h || pathname.startsWith(`${h}/`);
 }
 
-export function SiteNav({ items, ctaHref, ctaLabel }: { items: NavLinkItem[]; ctaHref: string; ctaLabel: string }) {
+export function SiteNav({ items, ctaHref, ctaLabel, logos }: { items: NavLinkItem[]; ctaHref: string; ctaLabel: string; logos?: LogoOverrides }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [prevPath, setPrevPath] = useState(pathname);
@@ -133,7 +134,7 @@ export function SiteNav({ items, ctaHref, ctaLabel }: { items: NavLinkItem[]; ct
         <div id="menu-mobile" ref={panelRef} className="mobile-panel on-dark" role="dialog" aria-modal="true" aria-label="Menu principal">
           <div className="wrap flex h-[4.5rem] flex-none items-center justify-between">
             <Link href="/" aria-label="BatiNova Construction — accueil" onClick={() => setOpen(false)}>
-              <Logo variant="onDark" className="w-[9.25rem]" />
+              <Logo variant="onDark" overrides={logos} className="w-[9.25rem]" />
             </Link>
             <button
               type="button"

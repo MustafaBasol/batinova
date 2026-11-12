@@ -4,6 +4,7 @@ import { LeadFiltersSchema, listLeads } from "@/lib/cms/leads";
 import { LEAD_STATUSES, REGIONS, REGION_NAMES } from "@/lib/cms/constants";
 import { formatParis } from "@/lib/cms/datetime";
 import { LEAD_STATUS_LABELS, PROJECT_TYPES } from "@/lib/leads/options";
+import { LeadPurgeButton } from "@/components/admin/LeadPurge";
 import { PageHeader } from "@/components/admin/AdminShell";
 import { Card, Notice } from "@/components/admin/ui";
 import { btn, inputCls } from "@/components/admin/styles";
@@ -37,6 +38,12 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
           <button type="submit" className={btn.secondary}>Exporter en CSV (propriétaire)</button>
           <span className="text-xs text-charcoal/60">Export audité ; données personnelles : à manipuler avec précaution.</span>
         </form>
+      ) : null}
+      {user.role === "OWNER" ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <LeadPurgeButton />
+          <span className="text-xs text-charcoal/60">Efface définitivement les demandes dont la durée de conservation est échue (voir Réglages).</span>
+        </div>
       ) : null}
       <p className="text-sm text-charcoal/70">{total} demande{total > 1 ? "s" : ""}</p>
       <div className="overflow-x-auto rounded-sm border border-charcoal/15 bg-white">

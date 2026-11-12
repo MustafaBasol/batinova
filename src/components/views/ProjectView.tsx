@@ -19,13 +19,34 @@ import type { ProjectCardData } from "./Cards";
 
 export interface ProjectViewData extends ProjectCardData {
   blocks?: CmsBlock[];
-  media: { role: "GALLERY" | "BEFORE" | "AFTER" | string; media: MediaLike }[];
+  media: { role: "GALLERY" | "BEFORE" | "AFTER" | string; sortOrder?: number; media: MediaLike }[];
+}
+
+/** Pairs BEFORE/AFTER rows sharing a sortOrder (100+i); without sortOrder, pairs by order of appearance. */
+export function pairBeforeAfter(rows: ProjectViewData["media"]): { before: MediaLike; after: MediaLike }[] {
+  const bs = rows.map((r, i) => ({ r, i })).filter((x) => x.r.role === "BEFORE");
+  const as = rows.map((r, i) => ({ r, i })).filter((x) => x.r.role === "AFTER");
+  const key = (x: { r: { sortOrder?: number }; i: number }) => x.r.sortOrder ?? x.i;
+  const sorted = (l: typeof bs) => [...l].sort((a, b) => key(a) - key(b) || a.i - b.i);
+  const sb = sorted(bs);
+  const sa = sorted(as);
+  const pairs: { order: number; before: MediaLike; after: MediaLike }[] = [];
+  const usedAfter = new Set<number>();
+  for (const b of sb) {
+    const hasOrder = b.r.sortOrder !== undefined;
+    const idx = hasOrder
+      ? sa.findIndex((a, n) => !usedAfter.has(n) && a.r.sortOrder === b.r.sortOrder)
+      : sa.findIndex((_, n) => !usedAfter.has(n));
+    if (idx < 0) continue;
+    usedAfter.add(idx);
+    pairs.push({ order: key(b), before: b.r.media, after: sa[idx]!.r.media });
+  }
+  return pairs.sort((x, y) => x.order - y.order).map(({ before, after }) => ({ before, after }));
 }
 
 export function ProjectView({ project, media }: { project: ProjectViewData; media: Record<string, MediaLike> }) {
   const region = project.region ? REGION_LABELS[project.region as keyof typeof REGION_LABELS] : null;
-  const before = project.media.find((m) => m.role === "BEFORE")?.media;
-  const after = project.media.find((m) => m.role === "AFTER")?.media;
+  const pairs = pairBeforeAfter(project.media);
   const gallery = project.media.filter((m) => m.role === "GALLERY").map((m) => m.media);
   const hero = project.coverImage ?? gallery[0];
   return (
@@ -48,12 +69,16 @@ export function ProjectView({ project, media }: { project: ProjectViewData; medi
           <MediaFrame media={hero} ratio="16 / 9" priority sizes="(min-width: 1700px) 1536px, 100vw" frameClassName="!aspect-[4/3] sm:!aspect-[16/9]" />
         </div>
       )}
-      {before && after && (
+      {pairs.length > 0 && (
         <section className="wrap section-tight" aria-labelledby="avant-apres">
           <h2 id="avant-apres" className="display h-section mb-8">
             Avant / après
           </h2>
-          <BeforeAfter before={before} after={after} />
+          <div className="space-y-10">
+            {pairs.map((p, i) => (
+              <BeforeAfter key={`${p.before.storageKey}-${p.after.storageKey}-${i}`} before={p.before} after={p.after} />
+            ))}
+          </div>
         </section>
       )}
       {gallery.length > 0 && (

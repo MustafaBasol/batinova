@@ -2,6 +2,7 @@
 // Serves ONLY the public storage root (MEDIA_STORAGE_DIR). Lead attachments live
 // in PRIVATE_STORAGE_DIR and are unreachable from here by construction.
 // Only raster image types are served; anything else is a 404.
+import { db } from "@/lib/db";
 import { getPublicStorage, isValidStorageKey } from "@/lib/storage";
 import { isRasterImageMime, mimeFromKey } from "@/lib/storage/mime";
 
@@ -21,6 +22,19 @@ export async function GET(_req: Request, ctx: { params: Promise<{ key: string[] 
   if (!isValidStorageKey(key)) return notFound();
   const mime = mimeFromKey(key);
   if (!isRasterImageMime(mime)) return notFound();
+
+  // Soft-deleted media must not be served. Variant keys share the master's base
+  // (<yyyy>/<mm>/<hex>[-w<width>].<ext>), so the owning row is found through the unique storageKey index.
+  const base = key.replace(/\.[a-z0-9]+$/, "").replace(/-w\d+$/, "");
+  try {
+    const owner = await db.media.findFirst({
+      where: { storageKey: { in: [key, `${base}.webp`] } },
+      select: { deletedAt: true },
+    });
+    if (owner?.deletedAt) return notFound();
+  } catch {
+    return notFound(); // fail closed if ownership cannot be verified
+  }
 
   const obj = await getPublicStorage().getStream(key);
   if (!obj) return notFound();

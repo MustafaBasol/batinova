@@ -59,9 +59,21 @@ SQLite.
   (or the better-sqlite3 `.backup()` API) — do not copy the live file while writing. Daily,
   keep 30 days, copy off-site, encrypted (contains leads = personal data). Test restores monthly.
 - Media and private dirs: daily incremental sync (e.g. restic/rclone) to encrypted off-site storage.
-- Scheduled jobs to add (not yet wired): daily `purgeExpiredLeads()`, `pruneExpiredSessions()`,
-  `pruneRateLimitBuckets()` — via a cron calling a small script or an OWNER admin action.
+- Scheduled retention purge: see "Retention purge cron" below.
 - Restoring a backup can resurrect purged leads: re-run the purge after any restore.
+
+### Retention purge cron (GDPR) — REQUIRED in production
+
+`npm run maintenance:purge` deletes leads past their retention date (and spam / long-soft-deleted leads, with
+their private attachments), expired sessions and stale rate-limit buckets. It logs counts only. Run it daily
+from the app directory with the production environment loaded (`.env` is read automatically):
+
+```
+17 3 * * * cd /srv/batinova && /usr/bin/npm run maintenance:purge >> /var/log/batinova-purge.log 2>&1
+```
+
+An OWNER can also trigger the lead part from the leads inbox ("Purger les demandes arrivées à échéance"; audited).
+Re-run it after any backup restore.
 
 ## 5. PostgreSQL migration path
 
