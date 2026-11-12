@@ -4,13 +4,15 @@ import { projectsIndexBreadcrumbs } from "@/components/site/breadcrumbs";
 import { ProjectCard, ProjectsEmptyState } from "@/components/views/Cards";
 import { projectsIndexUrl } from "@/lib/content/paths";
 import { listPublishedProjects } from "@/lib/content/public";
-import { buildMetadata } from "@/lib/seo/metadata";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { buildBreadcrumbList, graph } from "@/lib/seo/jsonld";
+import { seoMetadata } from "@/lib/seo/server";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const projects = await listPublishedProjects({ limit: 1 });
-  return buildMetadata({
+  return seoMetadata({
     title: "Réalisations",
     description: "Les réalisations de BatiNova Construction : rénovation, extension et construction.",
     path: projectsIndexUrl(),
@@ -23,6 +25,7 @@ export default async function ProjectsPage() {
   const projects = await listPublishedProjects();
   return (
     <>
+      <JsonLd data={graph(buildBreadcrumbList(projectsIndexBreadcrumbs()))} />
       <div className="wrap pt-6">
         <Breadcrumbs items={projectsIndexBreadcrumbs()} />
       </div>

@@ -106,3 +106,10 @@ Re-run it after any backup restore.
 - [ ] Domain/DNS/mail access; MX/SPF/DKIM/DMARC; which mailboxes are real vs aliases.
 - [ ] Google Search Console / Business Profile ownership (owner-verified only).
 - [ ] Hosting choice (§2) and backup destination.
+
+## 8. SEO switches (seo-content, Phase 4)
+- `SITE_INDEXING=true` is required **only in production** (https://btnv.fr). Any other value keeps the whole site out of search engines (robots.txt `Disallow: /`, empty sitemap, `X-Robots-Tag: noindex, nofollow` header and `<meta name="robots" content="noindex">`).
+- `CANONICAL_HOST=btnv.fr` enables the `www.btnv.fr` -> `https://btnv.fr` 301 (done in `src/proxy.ts`). Also redirect `http` -> `https` and `www` at the reverse proxy / DNS level if possible.
+- `SITE_URL=https://btnv.fr` must be set in production (canonical, sitemap, Open Graph, JSON-LD are all built from it).
+- The static CSP in `next.config.ts` allows no third-party origin: enabling Plausible or GA4 in /admin also requires adding the provider origins to `script-src` / `connect-src` (and `img-src` for GA4). Not done by default.
+- Post-deploy checks: see `docs/SEO_IMPLEMENTATION.md` section 9.

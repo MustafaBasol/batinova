@@ -4,16 +4,20 @@ import { simpleBreadcrumbs } from "@/components/site/breadcrumbs";
 import { QuoteForm } from "@/components/quote/QuoteForm";
 import { PROJECT_TYPES } from "@/lib/leads/options";
 import { getSettings } from "@/lib/settings";
-import { buildMetadata } from "@/lib/seo/metadata";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { buildBreadcrumbList, graph } from "@/lib/seo/jsonld";
+import { seoMetadata } from "@/lib/seo/server";
 import { submitQuote } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = buildMetadata({
-  title: "Demander un devis",
-  description: "Décrivez votre projet de rénovation, d’extension ou de construction en quelques étapes : BatiNova Construction revient vers vous.",
-  path: "/devis",
-});
+export async function generateMetadata(): Promise<Metadata> {
+  return seoMetadata({
+    title: "Demander un devis",
+    description: "Décrivez votre projet de rénovation, d’extension ou de construction en quelques étapes : BatiNova Construction revient vers vous.",
+    path: "/devis",
+  });
+}
 
 type Props = { searchParams: Promise<{ source?: string; type?: string }> };
 
@@ -24,6 +28,7 @@ export default async function QuotePage({ searchParams }: Props) {
   const type = sp.type && sp.type in PROJECT_TYPES ? sp.type : undefined;
   return (
     <>
+      <JsonLd data={graph(buildBreadcrumbList(simpleBreadcrumbs("Demander un devis", "/devis")))} />
       <div className="wrap pt-6">
         <Breadcrumbs items={simpleBreadcrumbs("Demander un devis", "/devis")} />
       </div>

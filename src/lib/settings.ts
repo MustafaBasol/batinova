@@ -67,6 +67,7 @@ export async function updateSetting<K extends SettingKey>(
 
 /** Roles allowed to edit each settings group. */
 export const SETTING_EDIT_ROLES: Record<SettingKey, readonly ("OWNER" | "EDITOR")[]> = {
+  branding: ["OWNER"],
   company: ["OWNER"],
   address: ["OWNER"],
   serviceAreas: ["OWNER", "EDITOR"],
