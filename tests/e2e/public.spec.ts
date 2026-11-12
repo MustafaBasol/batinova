@@ -22,7 +22,14 @@ for (const vp of [{ name: "360px", width: 360, height: 740 }, { name: "1280px", 
         expect((await page.title()).length).toBeGreaterThan(5);
         await expect(page.locator("main")).toHaveCount(1);
         const { sw, cw } = await noHorizontalOverflow(page);
-        expect(sw, `scrollWidth ${sw} > clientWidth ${cw}`).toBeLessThanOrEqual(cw);
+        const offenders = sw > cw
+          ? await page.evaluate((w) =>
+              [...document.querySelectorAll("body *")]
+                .filter((e) => e.getBoundingClientRect().right > w + 0.5)
+                .slice(0, 8)
+                .map((e) => `${e.tagName.toLowerCase()}.${String(e.getAttribute("class") ?? "").slice(0, 60)} right=${Math.round(e.getBoundingClientRect().right)}`), cw)
+          : [];
+        expect(sw, `scrollWidth ${sw} > clientWidth ${cw}; offenders: ${offenders.join(" | ")}`).toBeLessThanOrEqual(cw);
       });
     }
   });
