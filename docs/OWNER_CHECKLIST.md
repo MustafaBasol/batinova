@@ -44,12 +44,12 @@ Tick an item only when the real value has been entered in `/admin` (Réglages) a
 
 ## E. Production environment and operations
 
-- [ ] Hosting with a long-running Node 24 process and PERSISTENT disk (see `docs/DEPLOYMENT.md`); one instance only (SQLite); HTTPS terminated in front
+- [ ] Hosting with a long-running Node 24 process and PERSISTENT disk (see `docs/DEPLOYMENT.md`); one instance only (local files); HTTPS terminated in front
 - [ ] Env vars: `NODE_ENV=production`, `SITE_URL=https://btnv.fr`, `SITE_INDEXING=true` (only at launch, after sections A and B), `CANONICAL_HOST=btnv.fr`, `TRUST_PROXY=true` (only behind a proxy that overwrites `X-Forwarded-For`; otherwise all visitors share one rate-limit bucket), distinct 32+ character `SESSION_SECRET` and `IP_HASH_SECRET` from the secret store, `DATABASE_URL`, `MEDIA_STORAGE_DIR`, `PRIVATE_STORAGE_DIR` on separate persistent volumes
 - [ ] Never leave `SITE_INDEXING=true` on staging or previews
-- [ ] Deploy steps: `npm ci`, `npm run build`, `npm run db:deploy`, `npm run start`; then `npm run admin:create -- --email <you> --name "<Name>" --role OWNER` (hidden password prompt) and create the editor accounts from `/admin/utilisateurs`
+- [ ] Deploy steps: Hostinger build `npm run build:hostinger` (migrate + seed + first OWNER from `BOOTSTRAP_OWNER_*`, see `docs/DEPLOYMENT.md` §6), start `npm run start`; or `npm run admin:create -- --email <you> --name "<Name>" --role OWNER` (hidden password prompt) and create the editor accounts from `/admin/utilisateurs`
 - [ ] Remove or change every test/dev account; use long unique passwords
-- [ ] Daily backups of the SQLite DB (online `.backup`), media and private dirs, copied off-site and encrypted; test a restore
+- [ ] Daily backups of the MySQL DB (`scripts/ops/backup.sh`), media and private dirs, copied off-site and encrypted; test a restore
 - [ ] Cron for GDPR retention: `npm run maintenance:purge` daily (see `docs/DEPLOYMENT.md`); re-run it after any restore
 - [ ] After go-live check with `curl -I`: HTTPS + HSTS, `www` redirects to apex (301), `/robots.txt` allows the site, `/sitemap.xml` lists only published pages
 - [ ] Re-run `npm run build && npm run test:e2e` against the release candidate before the final DNS switch (these tests use an isolated local database and never touch production)

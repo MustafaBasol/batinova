@@ -1,7 +1,6 @@
-import { createRequire } from "node:module";
-import path from "node:path";
 import { expect, test, type APIRequestContext } from "@playwright/test";
-import { login, newClientContext, root } from "./helpers";
+import { queryDatabase } from "../support/mysql";
+import { creds, login, newClientContext } from "./helpers";
 
 /**
  * SEO, content integrity, link crawl, redirects/410 and privacy defaults against the PRODUCTION build
@@ -10,11 +9,8 @@ import { login, newClientContext, root } from "./helpers";
 const SITE = "https://btnv.fr";
 const toLocal = (u: string) => u.replace(SITE, "");
 
-// better-sqlite3 ships no type declarations: minimal local typing (read-only access to the isolated E2E database).
-interface Stmt { get(...a: unknown[]): unknown; all(...a: unknown[]): unknown[] }
-interface Conn { prepare(sql: string): Stmt; close(): void }
-const Database = createRequire(import.meta.url)("better-sqlite3") as new (file: string, opts: { readonly: boolean }) => Conn;
-const db = () => new Database(path.join(root, ".tmp", "e2e", "e2e.db"), { readonly: true });
+// Read-only access to the isolated E2E MySQL test database (URL written by start-server.mjs).
+const q = <T,>(sql: string, params: unknown[] = []) => queryDatabase<T>(creds.databaseUrl, sql, params);
 
 function visibleText(html: string): string {
   return html
@@ -67,9 +63,7 @@ test.describe("metadata, canonical, Open Graph, structured data", () => {
       expect(meta(body, "name", "twitter:card")).toBeTruthy();
       expect(body.match(/<h1/g)?.length).toBe(1);
       // placeholder / noindex content must be noindex even with SITE_INDEXING=true
-      const dbh = db();
-      const row = dbh.prepare("select isPlaceholder, noindex from Page where path = ?").get(p === "/" ? "" : p.slice(1)) as { isPlaceholder: number; noindex: number } | undefined;
-      dbh.close();
+      const row = (await q<{ isPlaceholder: number; noindex: number }>("select isPlaceholder, noindex from Page where path = ?", [p === "/" ? "" : p.slice(1)]))[0];
       const robots = robotsMetas(body);
       if (row && (row.isPlaceholder || row.noindex)) expect(robots, "placeholder/noindex page must carry noindex").toContain("noindex");
       else expect(robots).not.toContain("noindex");
@@ -114,9 +108,7 @@ test.describe("metadata, canonical, Open Graph, structured data", () => {
   });
 
   test("published post: BlogPosting grounded in post data, canonical, OG article", async ({ request }) => {
-    const dbh = db();
-    const post = dbh.prepare("select slug, title from Post where status = 'PUBLISHED' and deletedAt is null limit 1").get() as { slug: string; title: string } | undefined;
-    dbh.close();
+    const post = (await q<{ slug: string; title: string }>("select slug, title from Post where status = 'PUBLISHED' and deletedAt is null limit 1"))[0];
     test.skip(!post, "no published post (run the full suite: admin.spec publishes one)");
     const { status, body } = await html(request, `/blog/${post!.slug}`);
     expect(status).toBe(200);
@@ -136,10 +128,8 @@ test.describe("sitemap and robots", () => {
     expect(res.headers()["content-type"]).toContain("xml");
     const locs = [...(await res.text()).matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]!);
     expect(locs.length).toBeGreaterThan(5);
-    const dbh = db();
-    const drafts = (dbh.prepare("select slug from Post where status != 'PUBLISHED' or deletedAt is not null").all() as { slug: string }[]).map((r) => r.slug);
-    const hiddenPages = (dbh.prepare("select path from Page where status != 'PUBLISHED' or deletedAt is not null or noindex = 1 or isPlaceholder = 1").all() as { path: string }[]).map((r) => r.path);
-    dbh.close();
+    const drafts = (await q<{ slug: string }>("select slug from Post where status != 'PUBLISHED' or deletedAt is not null")).map((r) => r.slug);
+    const hiddenPages = (await q<{ path: string }>("select path from Page where status != 'PUBLISHED' or deletedAt is not null or noindex = 1 or isPlaceholder = 1")).map((r) => r.path);
     for (const loc of locs) {
       expect(loc.startsWith(`${SITE}`), loc).toBe(true);
       expect(loc).not.toMatch(/\/admin|\/media\/|\/devis\/merci|\?/);
@@ -274,9 +264,7 @@ test.describe("internal link crawl and content integrity", () => {
   });
 
   test("seeded articles contain no prices, durations or invented facts", async () => {
-    const dbh = db();
-    const posts = dbh.prepare("select slug, title, status, body, excerpt from Post").all() as { slug: string; title: string; status: string; body: string; excerpt: string | null }[];
-    dbh.close();
+    const posts = (await q<{ slug: string; title: string; status: string; body: unknown; excerpt: string | null }>("select slug, title, status, body, excerpt from Post")).map((p) => ({ ...p, body: typeof p.body === "string" ? p.body : JSON.stringify(p.body) }));
     expect(posts.length).toBeGreaterThanOrEqual(3);
     const bad: string[] = [];
     for (const p of posts) {

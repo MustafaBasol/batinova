@@ -22,16 +22,21 @@ export async function rateLimit(
   windowMs: number,
   now: Date = new Date(),
 ): Promise<RateLimitResult> {
+  // Atomic on MySQL/MariaDB (InnoDB REPEATABLE READ does NOT serialise read-then-write transactions the way
+  // SQLite did): one INSERT ... ON DUPLICATE KEY UPDATE decides "new window" vs "increment" under the row lock.
+  // MySQL evaluates the SET list left to right, so `count` must be assigned before `windowStart`.
+  const cutoff = new Date(now.getTime() - windowMs);
   return db.$transaction(async (tx) => {
-    const bucket = await tx.rateLimitBucket.findUnique({ where: { key } });
-    const expired = !bucket || now.getTime() - bucket.windowStart.getTime() >= windowMs;
-    const updated = expired
-      ? await tx.rateLimitBucket.upsert({
-          where: { key },
-          create: { key, count: 1, windowStart: now },
-          update: { count: 1, windowStart: now },
-        })
-      : await tx.rateLimitBucket.update({ where: { key }, data: { count: { increment: 1 } } });
+    await tx.$executeRaw`
+      INSERT INTO \`RateLimitBucket\` (\`key\`, \`count\`, \`windowStart\`, \`updatedAt\`)
+      VALUES (${key}, 1, ${now}, ${now})
+      ON DUPLICATE KEY UPDATE
+        \`count\` = IF(\`windowStart\` <= ${cutoff}, 1, \`count\` + 1),
+        \`windowStart\` = IF(\`windowStart\` <= ${cutoff}, ${now}, \`windowStart\`),
+        \`updatedAt\` = ${now}`;
+    const rows = await tx.$queryRaw<{ count: number; windowStart: Date }[]>`
+      SELECT \`count\`, \`windowStart\` FROM \`RateLimitBucket\` WHERE \`key\` = ${key} FOR UPDATE`;
+    const updated = { count: Number(rows[0]!.count), windowStart: new Date(rows[0]!.windowStart) };
     const allowed = updated.count <= limit;
     return {
       allowed,

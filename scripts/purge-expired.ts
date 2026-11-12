@@ -4,6 +4,8 @@
  * Deletes leads past their retention date (+ attachments), expired sessions and stale rate-limit buckets.
  * Prints counts only (no personal data). Exit code 1 on failure.
  */
+export {};
+
 try {
   process.loadEnvFile(".env");
 } catch {

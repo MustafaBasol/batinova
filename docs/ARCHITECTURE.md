@@ -11,7 +11,7 @@ coordinator decision and a new Prisma migration.
 | Runtime | Node 24 (>= 24), npm 11 |
 | Framework | Next.js 16.4.6 App Router, React 19.3.1, TypeScript 6.0.3 (strict, `noUncheckedIndexedAccess`) |
 | Styling | Tailwind CSS 4.3.5 (`@tailwindcss/postcss`), tokens in `src/app/globals.css` `@theme` |
-| DB / ORM | SQLite + Prisma 7.10.1 (`prisma-client` generator → `src/generated/prisma`, gitignored) with `@prisma/adapter-better-sqlite3` 7.10.1 / `better-sqlite3` 12.11.1 |
+| DB / ORM | MySQL (Hostinger) + Prisma 7.10.1 (`prisma-client` generator → `src/generated/prisma`, gitignored) with `@prisma/adapter-mariadb` 7.10.1 (`mariadb` driver) |
 | Validation | zod 4.6.7 |
 | Passwords | `@node-rs/argon2` 2.2.2 (Argon2id, m=19 MiB, t=2, p=1) |
 | Images | sharp 0.35.5 (dependency only; upload pipeline = cms-admin) |
@@ -19,7 +19,7 @@ coordinator decision and a new Prisma migration.
 | Tests | Vitest 5.1.0 (`maxWorkers: 2`, `fileParallelism: false`, isolated `prisma/test-vitest.db`) |
 | Lint | ESLint 9.39.5 + eslint-config-next 16.4.6 (flat config). ESLint 10 not used: several Next plugins do not yet declare ESLint 10 support. TypeScript 7 (native) not used: typescript-eslint supports `<6.1`. |
 
-Why SQLite + Prisma: single-site CMS with low write volume, zero ops, one file to back up;
+Why MySQL + Prisma (decision 002, see docs/DEPLOYMENT.md): Hostinger Business provides managed MySQL and its Node.js deployments overwrite the release folders, so state must live in the database/persistent storage;
 Prisma 7's driver adapter installs cleanly on Windows. PostgreSQL path: `docs/DEPLOYMENT.md`.
 
 ## 2. Directory map & FILE OWNERSHIP
@@ -216,7 +216,7 @@ analytics, lead export/hard delete/purge, permanent deletes, redirects 410.
 ## 10. Security helpers — `src/lib/security/`
 
 `rateLimit(key, limit, windowMs, now?) → {allowed, count, remaining, retryAfterMs}` (DB fixed
-window; serialised by the single SQLite writer, concurrency covered by tests), `resetRateLimit`,
+window; one atomic INSERT … ON DUPLICATE KEY UPDATE under the row lock, concurrency covered by tests), `resetRateLimit`,
 `pruneRateLimitBuckets`; `getClientIp(headers)` (reads forwarding headers only if
 `TRUST_PROXY=true`; uses the RIGHTMOST X-Forwarded-For entry = the one appended by our proxy,
 because the leftmost is client-controlled; non-IP values are ignored; otherwise the shared

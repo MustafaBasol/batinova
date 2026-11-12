@@ -1,6 +1,7 @@
 // BatiNova — Prisma schema (owner: architect-security).
 // Datasource URL is configured in prisma.config.ts (Prisma 7).
-// SQLite for v1; see docs/DEPLOYMENT.md for the PostgreSQL migration path.
+// MySQL/MariaDB (Hostinger) via @prisma/adapter-mariadb; see docs/DEPLOYMENT.md.
+// String maps to VARCHAR(191) on MySQL: fields that can be longer are annotated explicitly.
 // Changes to this file must be coordinated (shared contract) — add a new
 // migration with `npm run db:migrate -- --name <change>`; never edit applied ones.
 
@@ -11,7 +12,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "mysql"
 }
 
 // ---------------------------------------------------------------- enums
@@ -77,8 +78,8 @@ enum MailDeliveryState {
 
 model User {
   id               String    @id @default(cuid())
-  email            String    @unique // stored lower-cased
-  name             String
+  email            String @db.VarChar(255)    @unique // stored lower-cased
+  name             String @db.VarChar(255)
   role             Role      @default(EDITOR)
   passwordHash     String
   active           Boolean   @default(true)
@@ -109,7 +110,7 @@ model Session {
   createdAt  DateTime @default(now())
   expiresAt  DateTime // absolute lifetime
   lastSeenAt DateTime @default(now()) // idle timeout reference
-  userAgent  String? // truncated to 200 chars
+  userAgent  String? @db.VarChar(255) // truncated to 200 chars
 
   @@index([userId])
   @@index([expiresAt])
@@ -128,7 +129,7 @@ model AuditLog {
   id         String   @id @default(cuid())
   actorId    String?
   actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
-  action     String // e.g. "auth.login", "page.publish", "lead.export"
+  action     String @db.VarChar(255) // e.g. "auth.login", "page.publish", "lead.export"
   entityType String?
   entityId   String?
   summary    Json? // minimal, no PII / secrets
@@ -143,18 +144,18 @@ model AuditLog {
 
 model Media {
   id            String      @id @default(cuid())
-  storageKey    String      @unique // relative key inside the StorageDriver, e.g. "2026/11/abc123.webp"
-  originalName  String // sanitized
-  mime          String
+  storageKey    String @db.VarChar(255)      @unique // relative key inside the StorageDriver, e.g. "2026/11/abc123.webp"
+  originalName  String @db.VarChar(255) // sanitized
+  mime          String @db.VarChar(255)
   sizeBytes     Int
   width         Int?
   height        Int?
-  alt           String      @default("")
-  caption       String?
-  credit        String?
+  alt           String @db.VarChar(500)      @default("")
+  caption       String? @db.Text
+  credit        String? @db.VarChar(255)
   licenseType   LicenseType @default(UNKNOWN)
-  licenseSource String? // URL
-  licenseNotes  String?
+  licenseSource String? @db.Text // URL
+  licenseNotes  String? @db.Text
   isPlaceholder Boolean     @default(false)
   focalX        Float? // 0..1 focal point for object-position
   focalY        Float? // 0..1
@@ -185,8 +186,8 @@ model Page {
   // path: "" = home (route "/"), otherwise slash-separated lower-case slug
   // segments without leading/trailing slash, e.g. "a-propos", "services/renovation".
   id            String        @id @default(cuid())
-  path          String        @unique
-  title         String
+  path          String @db.VarChar(255)        @unique
+  title         String @db.VarChar(255)
   template      PageTemplate  @default(STANDARD)
   blocks        Json // CmsBlock[] — validated by src/lib/blocks/schema.ts
   status        ContentStatus @default(DRAFT)
@@ -194,19 +195,19 @@ model Page {
   scheduledAt   DateTime?
   showInNav     Boolean       @default(false)
   navOrder      Int           @default(0)
-  navLabel      String?
+  navLabel      String? @db.VarChar(255)
   parentId      String?
   parent        Page?         @relation("PageTree", fields: [parentId], references: [id], onDelete: SetNull)
   children      Page[]        @relation("PageTree")
   isPlaceholder Boolean       @default(false)
 
   // SEO
-  metaTitle       String?
-  metaDescription String?
+  metaTitle       String? @db.VarChar(255)
+  metaDescription String? @db.Text
   ogImageId       String?
   ogImage         Media?  @relation("PageOgImage", fields: [ogImageId], references: [id], onDelete: SetNull)
   noindex         Boolean @default(false)
-  canonicalPath   String?
+  canonicalPath   String? @db.VarChar(255)
 
   // soft delete ("corbeille"); public queries always require deletedAt = null
   deletedAt   DateTime?
@@ -239,16 +240,16 @@ model PageRevision {
 
 model Category {
   id          String  @id @default(cuid())
-  slug        String  @unique
-  name        String
-  description String?
+  slug        String @db.VarChar(255)  @unique
+  name        String @db.VarChar(255)
+  description String? @db.Text
 
-  metaTitle       String?
-  metaDescription String?
+  metaTitle       String? @db.VarChar(255)
+  metaDescription String? @db.Text
   ogImageId       String?
   ogImage         Media?  @relation("CategoryOgImage", fields: [ogImageId], references: [id], onDelete: SetNull)
   noindex         Boolean @default(false)
-  canonicalPath   String?
+  canonicalPath   String? @db.VarChar(255)
 
   // soft delete ("corbeille"); public queries always require deletedAt = null
   deletedAt   DateTime?
@@ -260,8 +261,8 @@ model Category {
 
 model Tag {
   id          String    @id @default(cuid())
-  slug        String    @unique
-  name        String
+  slug        String @db.VarChar(255)    @unique
+  name        String @db.VarChar(255)
   // soft delete ("corbeille"); public queries always require deletedAt = null
   deletedAt   DateTime?
   deletedById String? // plain id (no FK) — audit log holds the authoritative trail
@@ -271,28 +272,28 @@ model Tag {
 
 model Post {
   id                String        @id @default(cuid())
-  slug              String        @unique
-  title             String
-  excerpt           String?
+  slug              String @db.VarChar(255)        @unique
+  title             String @db.VarChar(255)
+  excerpt           String? @db.Text
   body              Json // Tiptap JSON doc (whitelisted; validate with src/lib/richtext/schema.ts)
   blocks            Json? // optional CmsBlock[] (rarely used for posts)
   coverImageId      String?
   coverImage        Media?        @relation("PostCover", fields: [coverImageId], references: [id], onDelete: SetNull)
   categoryId        String?
   category          Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  authorDisplayName String?
+  authorDisplayName String? @db.VarChar(255)
   status            ContentStatus @default(DRAFT)
   publishedAt       DateTime?
   scheduledAt       DateTime?
   readingMinutes    Int?
   isPlaceholder     Boolean       @default(false)
 
-  metaTitle       String?
-  metaDescription String?
+  metaTitle       String? @db.VarChar(255)
+  metaDescription String? @db.Text
   ogImageId       String?
   ogImage         Media?  @relation("PostOgImage", fields: [ogImageId], references: [id], onDelete: SetNull)
   noindex         Boolean @default(false)
-  canonicalPath   String?
+  canonicalPath   String? @db.VarChar(255)
 
   // soft delete ("corbeille"); public queries always require deletedAt = null
   deletedAt   DateTime?
@@ -335,11 +336,11 @@ model PostRevision {
 
 model Project {
   id            String        @id @default(cuid())
-  slug          String        @unique
-  title         String
-  summary       String?
+  slug          String @db.VarChar(255)        @unique
+  title         String @db.VarChar(255)
+  summary       String? @db.Text
   region        Region?
-  locationLabel String? // free text, e.g. "Saint-Lô (50)" — only if owner-verified
+  locationLabel String? @db.VarChar(255) // free text, e.g. "Saint-Lô (50)" — only if owner-verified
   blocks        Json // CmsBlock[]
   coverImageId  String?
   coverImage    Media?        @relation("ProjectCover", fields: [coverImageId], references: [id], onDelete: SetNull)
@@ -349,12 +350,12 @@ model Project {
   sortOrder     Int           @default(0)
   isPlaceholder Boolean       @default(false)
 
-  metaTitle       String?
-  metaDescription String?
+  metaTitle       String? @db.VarChar(255)
+  metaDescription String? @db.Text
   ogImageId       String?
   ogImage         Media?  @relation("ProjectOgImage", fields: [ogImageId], references: [id], onDelete: SetNull)
   noindex         Boolean @default(false)
-  canonicalPath   String?
+  canonicalPath   String? @db.VarChar(255)
 
   // soft delete ("corbeille"); public queries always require deletedAt = null
   deletedAt   DateTime?
@@ -400,27 +401,27 @@ model ProjectRevision {
 
 model Lead {
   id                 String            @id @default(cuid())
-  name               String
-  email              String
+  name               String @db.VarChar(255)
+  email              String @db.VarChar(255)
   phone              String?
   postalCode         String
   city               String?
   region             Region?
-  projectType        String
-  message            String
+  projectType        String @db.VarChar(255)
+  message            String @db.Text
   budgetRange        String? // enum-like key, see src/lib/leads/options.ts
   desiredTimeline    String? // enum-like key, see src/lib/leads/options.ts
   desiredStartDate   String? // "YYYY-MM" or short free text (max 40), optional
-  source             String? // e.g. "contact", "service:renovation", "zone:manche"
+  source             String? @db.VarChar(255) // e.g. "contact", "service:renovation", "zone:manche"
   consentAt          DateTime
   consentTextVersion String
   status             LeadStatus        @default(NEW)
-  internalNotes      String?
+  internalNotes      String? @db.Text
   ipHash             String? // HMAC-SHA256(IP_HASH_SECRET, ip) — never the raw IP
-  userAgent          String? // truncated to 200 chars
+  userAgent          String? @db.VarChar(255) // truncated to 200 chars
   mailDeliveryState  MailDeliveryState @default(NOT_CONFIGURED)
   mailAttempts       Int               @default(0)
-  lastMailError      String? // sanitized, max 300 chars, never contains credentials
+  lastMailError      String? @db.Text // sanitized, max 300 chars, never contains credentials
   lastMailAttemptAt  DateTime?
   attachments        LeadAttachment[]
   retentionUntil     DateTime
@@ -444,9 +445,9 @@ model LeadAttachment {
   id           String         @id @default(cuid())
   leadId       String
   lead         Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  storageKey   String         @unique
-  originalName String // sanitized
-  mime         String
+  storageKey   String @db.VarChar(255)         @unique
+  originalName String @db.VarChar(255) // sanitized
+  mime         String @db.VarChar(255)
   sizeBytes    Int
   kind         AttachmentKind
   createdAt    DateTime       @default(now())
@@ -465,8 +466,8 @@ enum NavLocation {
 model NavItem {
   id           String      @id @default(cuid())
   location     NavLocation
-  label        String
-  href         String? // used when pageId is null; validated (relative, https, mailto, tel)
+  label        String @db.VarChar(255)
+  href         String? @db.Text // used when pageId is null; validated (relative, https, mailto, tel)
   pageId       String? // when set, href derives from the page path; hidden unless page is public
   page         Page?       @relation(fields: [pageId], references: [id], onDelete: SetNull)
   parentId     String? // one nesting level (dropdown) for HEADER
@@ -493,11 +494,11 @@ model Setting {
 
 model Redirect {
   id          String   @id @default(cuid())
-  fromPath    String   @unique // absolute path starting with "/", no query/host
-  toPath      String? // null only for 410
+  fromPath    String @db.VarChar(255)   @unique // absolute path starting with "/", no query/host
+  toPath      String? @db.VarChar(255) // null only for 410
   statusCode  Int      @default(301) // 301 | 302 | 308 | 410 (validated in app layer)
   hits        Int      @default(0)
-  note        String?
+  note        String? @db.Text
   createdById String?
   createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())
