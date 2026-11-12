@@ -1,0 +1,47 @@
+/* Admin-only styles (owner: cms-admin). Scoped to .btnv-editor / .btnv-prose so they cannot leak to the public site. */
+.btnv-editor .ProseMirror {
+  min-height: 22rem;
+  padding: 1rem 1.25rem;
+  outline: none;
+  font-size: 1rem;
+  line-height: 1.7;
+}
+.btnv-editor .ProseMirror:focus-visible {
+  outline: 2px solid var(--color-beige);
+  outline-offset: -2px;
+}
+.btnv-editor .ProseMirror h2 { font-family: var(--font-serif); font-size: 1.6rem; margin: 1.4rem 0 0.6rem; }
+.btnv-editor .ProseMirror h3 { font-family: var(--font-serif); font-size: 1.3rem; margin: 1.2rem 0 0.5rem; }
+.btnv-editor .ProseMirror h4 { font-family: var(--font-serif); font-size: 1.1rem; margin: 1rem 0 0.4rem; font-weight: 600; }
+.btnv-editor .ProseMirror p { margin: 0.6rem 0; }
+.btnv-editor .ProseMirror ul { list-style: disc; padding-left: 1.5rem; }
+.btnv-editor .ProseMirror ol { list-style: decimal; padding-left: 1.5rem; }
+.btnv-editor .ProseMirror blockquote { border-left: 3px solid var(--color-beige); padding-left: 1rem; color: #4a4a4a; font-style: italic; margin: 1rem 0; }
+.btnv-editor .ProseMirror hr { border: 0; border-top: 1px solid rgb(48 48 48 / 0.3); margin: 1.5rem 0; }
+.btnv-editor .ProseMirror a { color: #6e5f4e; text-decoration: underline; }
+.btnv-editor .ProseMirror table { border-collapse: collapse; width: 100%; margin: 1rem 0; table-layout: fixed; }
+.btnv-editor .ProseMirror th, .btnv-editor .ProseMirror td { border: 1px solid rgb(48 48 48 / 0.3); padding: 0.4rem 0.6rem; vertical-align: top; }
+.btnv-editor .ProseMirror th { background: #f0e9df; text-align: left; }
+.btnv-editor .ProseMirror .selectedCell { background: #e6ddd2; }
+.btnv-editor .ProseMirror [data-fs="sm"] { font-size: 0.85em; }
+.btnv-editor .ProseMirror [data-fs="base"] { font-size: 1em; }
+.btnv-editor .ProseMirror [data-fs="lg"] { font-size: 1.25em; }
+.btnv-editor .ProseMirror [data-fs="xl"] { font-size: 1.6em; }
+.btnv-editor .ProseMirror [data-color="charcoal"] { color: #303030; }
+.btnv-editor .ProseMirror [data-color="graphite"] { color: #4a4a4a; }
+.btnv-editor .ProseMirror [data-color="bronze"] { color: #6e5f4e; }
+.btnv-editor .ProseMirror mark { color: inherit; padding: 0 0.1em; }
+.btnv-editor .ProseMirror mark[data-hl="beige"] { background: #e6ddd2; }
+.btnv-editor .ProseMirror mark[data-hl="sand"] { background: #f0e9df; }
+.btnv-editor .ProseMirror mark[data-hl="offwhite"] { background: #f5f2ec; outline: 1px solid #e6ddd2; }
+.btnv-editor .ProseMirror div[data-callout] { border-left: 4px solid var(--color-beige); background: #f5f2ec; padding: 0.5rem 1rem; margin: 1rem 0; }
+.btnv-editor .ProseMirror div[data-callout]::before { content: "À retenir"; display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: #6e5f4e; font-weight: 600; }
+.btnv-editor .ProseMirror div[data-callout="info"]::before { content: "Information"; }
+.btnv-editor .ProseMirror div[data-callout="attention"]::before { content: "Attention"; }
+.btnv-editor .ProseMirror div[data-callout="attention"] { border-left-color: #b45309; }
+.btnv-editor .ProseMirror figure[data-media-id] { margin: 1rem 0; }
+.btnv-editor .ProseMirror figure[data-media-id] img { max-width: 100%; height: auto; display: block; }
+.btnv-editor .ProseMirror figure[data-size="small"] { max-width: 18rem; }
+.btnv-editor .ProseMirror figure[data-size="medium"] { max-width: 32rem; }
+.btnv-editor .ProseMirror figure.ProseMirror-selectednode { outline: 2px solid var(--color-beige); }
+.btnv-editor .ProseMirror figcaption { font-size: 0.85rem; color: #4a4a4a; }

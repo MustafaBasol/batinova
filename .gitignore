@@ -13,3 +13,8 @@ coverage/
 /playwright-report/
 *.tsbuildinfo
 next-env.d.ts
+/src/generated/
+/prisma/*.db-wal
+/prisma/*.db-shm
+/prisma/test-*.db*
+/.tmp/
