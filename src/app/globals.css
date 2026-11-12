@@ -1,0 +1,48 @@
+/* Global styles & brand tokens. Tokens: owner architect-security (shared contract);
+   design-frontend owns everything below the "design-frontend" marker and may add
+   tokens (fonts, spacing) but must not rename the colour tokens. */
+@import "tailwindcss";
+
+@theme {
+  --color-charcoal: #303030;
+  --color-beige: #b2a08c;
+  --color-offwhite: #f5f2ec;
+  --color-white: #ffffff;
+  /* Rich-text palette (keys mirror src/lib/richtext/schema.ts) */
+  --color-rt-graphite: #4a4a4a;
+  --color-rt-bronze: #6e5f4e;
+  --color-rt-hl-beige: #e6ddd2;
+  --color-rt-hl-sand: #f0e9df;
+
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-serif: ui-serif, Georgia, "Times New Roman", serif;
+}
+
+html {
+  color-scheme: light;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--color-offwhite);
+  color: var(--color-charcoal);
+  font-family: var(--font-sans);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-beige);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---- design-frontend ---- */

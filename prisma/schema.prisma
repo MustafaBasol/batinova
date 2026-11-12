@@ -1,0 +1,505 @@
+// BatiNova — Prisma schema (owner: architect-security).
+// Datasource URL is configured in prisma.config.ts (Prisma 7).
+// SQLite for v1; see docs/DEPLOYMENT.md for the PostgreSQL migration path.
+// Changes to this file must be coordinated (shared contract) — add a new
+// migration with `npm run db:migrate -- --name <change>`; never edit applied ones.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ---------------------------------------------------------------- enums
+
+enum Role {
+  OWNER
+  EDITOR
+}
+
+enum ContentStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum PageTemplate {
+  HOME
+  STANDARD
+  SERVICE
+  ZONE
+  LEGAL
+  CONTACT
+}
+
+enum Region {
+  ILE_DE_FRANCE
+  NORMANDIE
+  MANCHE
+}
+
+enum ProjectMediaRole {
+  GALLERY
+  BEFORE
+  AFTER
+}
+
+enum LicenseType {
+  OWNED
+  LICENSED
+  STOCK_FREE
+  PLACEHOLDER
+  UNKNOWN
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUOTED
+  WON
+  LOST
+  SPAM
+  ARCHIVED
+}
+
+enum MailDeliveryState {
+  NOT_CONFIGURED
+  SENT
+  FAILED
+}
+
+// ---------------------------------------------------------------- auth & security
+
+model User {
+  id               String    @id @default(cuid())
+  email            String    @unique // stored lower-cased
+  name             String
+  role             Role      @default(EDITOR)
+  passwordHash     String
+  active           Boolean   @default(true)
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
+  lastLoginAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  sessions         Session[]
+  auditLogs        AuditLog[]
+  pagesUpdated     Page[]            @relation("PageUpdatedBy")
+  pageRevisions    PageRevision[]
+  postsUpdated     Post[]            @relation("PostUpdatedBy")
+  postRevisions    PostRevision[]
+  projectsUpdated  Project[]         @relation("ProjectUpdatedBy")
+  projectRevisions ProjectRevision[]
+  mediaUploaded    Media[]
+  settingsUpdated  Setting[]
+  redirectsCreated Redirect[]
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique // SHA-256 hex of the raw cookie token; raw token never stored
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime // absolute lifetime
+  lastSeenAt DateTime @default(now()) // idle timeout reference
+  userAgent  String? // truncated to 200 chars
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model RateLimitBucket {
+  key         String   @id // e.g. "login:ip:<hash>", "login:email:<hash>", "lead:ip:<hash>"
+  count       Int      @default(0)
+  windowStart DateTime
+  updatedAt   DateTime @updatedAt
+
+  @@index([windowStart])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action     String // e.g. "auth.login", "page.publish", "lead.export"
+  entityType String?
+  entityId   String?
+  summary    Json? // minimal, no PII / secrets
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@index([actorId])
+}
+
+// ---------------------------------------------------------------- media
+
+model Media {
+  id            String      @id @default(cuid())
+  storageKey    String      @unique // relative key inside the StorageDriver, e.g. "2026/11/abc123.webp"
+  originalName  String // sanitized
+  mime          String
+  sizeBytes     Int
+  width         Int?
+  height        Int?
+  alt           String      @default("")
+  caption       String?
+  credit        String?
+  licenseType   LicenseType @default(UNKNOWN)
+  licenseSource String? // URL
+  licenseNotes  String?
+  isPlaceholder Boolean     @default(false)
+  focalX        Float? // 0..1 focal point for object-position
+  focalY        Float? // 0..1
+  crop          Json? // optional { x, y, width, height } in source pixels
+  variants      Json? // e.g. [{ "width": 640, "key": "...", "mime": "image/webp" }]
+  uploadedById  String?
+  uploadedBy    User?       @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  // soft delete ("corbeille"); public queries always require deletedAt = null
+  deletedAt     DateTime?
+  deletedById   String? // plain id (no FK) — audit log holds the authoritative trail
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  ogForPages      Page[]         @relation("PageOgImage")
+  ogForPosts      Post[]         @relation("PostOgImage")
+  coverForPosts   Post[]         @relation("PostCover")
+  ogForProjects   Project[]      @relation("ProjectOgImage")
+  coverForProject Project[]      @relation("ProjectCover")
+  ogForCategories Category[]     @relation("CategoryOgImage")
+  projectLinks    ProjectMedia[]
+
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------- pages
+
+model Page {
+  // path: "" = home (route "/"), otherwise slash-separated lower-case slug
+  // segments without leading/trailing slash, e.g. "a-propos", "services/renovation".
+  id            String        @id @default(cuid())
+  path          String        @unique
+  title         String
+  template      PageTemplate  @default(STANDARD)
+  blocks        Json // CmsBlock[] — validated by src/lib/blocks/schema.ts
+  status        ContentStatus @default(DRAFT)
+  publishedAt   DateTime?
+  scheduledAt   DateTime?
+  showInNav     Boolean       @default(false)
+  navOrder      Int           @default(0)
+  navLabel      String?
+  parentId      String?
+  parent        Page?         @relation("PageTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children      Page[]        @relation("PageTree")
+  isPlaceholder Boolean       @default(false)
+
+  // SEO
+  metaTitle       String?
+  metaDescription String?
+  ogImageId       String?
+  ogImage         Media?  @relation("PageOgImage", fields: [ogImageId], references: [id], onDelete: SetNull)
+  noindex         Boolean @default(false)
+  canonicalPath   String?
+
+  // soft delete ("corbeille"); public queries always require deletedAt = null
+  deletedAt   DateTime?
+  deletedById String? // plain id (no FK) — audit log holds the authoritative trail
+  updatedById String?
+  updatedBy   User?          @relation("PageUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  revisions   PageRevision[]
+  navItems    NavItem[]
+
+  @@index([status, publishedAt])
+  @@index([deletedAt])
+  @@index([showInNav, navOrder])
+}
+
+model PageRevision {
+  id        String   @id @default(cuid())
+  pageId    String
+  page      Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  snapshot  Json
+  authorId  String?
+  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([pageId, createdAt])
+}
+
+// ---------------------------------------------------------------- blog
+
+model Category {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  name        String
+  description String?
+
+  metaTitle       String?
+  metaDescription String?
+  ogImageId       String?
+  ogImage         Media?  @relation("CategoryOgImage", fields: [ogImageId], references: [id], onDelete: SetNull)
+  noindex         Boolean @default(false)
+  canonicalPath   String?
+
+  // soft delete ("corbeille"); public queries always require deletedAt = null
+  deletedAt   DateTime?
+  deletedById String? // plain id (no FK) — audit log holds the authoritative trail
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  posts       Post[]
+}
+
+model Tag {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  name        String
+  // soft delete ("corbeille"); public queries always require deletedAt = null
+  deletedAt   DateTime?
+  deletedById String? // plain id (no FK) — audit log holds the authoritative trail
+  createdAt   DateTime  @default(now())
+  posts       PostTag[]
+}
+
+model Post {
+  id                String        @id @default(cuid())
+  slug              String        @unique
+  title             String
+  excerpt           String?
+  body              Json // Tiptap JSON doc (whitelisted; validate with src/lib/richtext/schema.ts)
+  blocks            Json? // optional CmsBlock[] (rarely used for posts)
+  coverImageId      String?
+  coverImage        Media?        @relation("PostCover", fields: [coverImageId], references: [id], onDelete: SetNull)
+  categoryId        String?
+  category          Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  authorDisplayName String?
+  status            ContentStatus @default(DRAFT)
+  publishedAt       DateTime?
+  scheduledAt       DateTime?
+  readingMinutes    Int?
+  isPlaceholder     Boolean       @default(false)
+
+  metaTitle       String?
+  metaDescription String?
+  ogImageId       String?
+  ogImage         Media?  @relation("PostOgImage", fields: [ogImageId], references: [id], onDelete: SetNull)
+  noindex         Boolean @default(false)
+  canonicalPath   String?
+
+  // soft delete ("corbeille"); public queries always require deletedAt = null
+  deletedAt   DateTime?
+  deletedById String? // plain id (no FK) — audit log holds the authoritative trail
+  updatedById String?
+  updatedBy   User?          @relation("PostUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  tags        PostTag[]
+  revisions   PostRevision[]
+
+  @@index([status, publishedAt])
+  @@index([deletedAt])
+  @@index([categoryId])
+}
+
+model PostTag {
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tagId  String
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+  @@index([tagId])
+}
+
+model PostRevision {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  snapshot  Json
+  authorId  String?
+  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([postId, createdAt])
+}
+
+// ---------------------------------------------------------------- projects (portfolio)
+
+model Project {
+  id            String        @id @default(cuid())
+  slug          String        @unique
+  title         String
+  summary       String?
+  region        Region?
+  locationLabel String? // free text, e.g. "Saint-Lô (50)" — only if owner-verified
+  blocks        Json // CmsBlock[]
+  coverImageId  String?
+  coverImage    Media?        @relation("ProjectCover", fields: [coverImageId], references: [id], onDelete: SetNull)
+  status        ContentStatus @default(DRAFT)
+  publishedAt   DateTime?
+  scheduledAt   DateTime?
+  sortOrder     Int           @default(0)
+  isPlaceholder Boolean       @default(false)
+
+  metaTitle       String?
+  metaDescription String?
+  ogImageId       String?
+  ogImage         Media?  @relation("ProjectOgImage", fields: [ogImageId], references: [id], onDelete: SetNull)
+  noindex         Boolean @default(false)
+  canonicalPath   String?
+
+  // soft delete ("corbeille"); public queries always require deletedAt = null
+  deletedAt   DateTime?
+  deletedById String? // plain id (no FK) — audit log holds the authoritative trail
+  updatedById String?
+  updatedBy   User?             @relation("ProjectUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  media       ProjectMedia[]
+  revisions   ProjectRevision[]
+
+  @@index([status, publishedAt])
+  @@index([deletedAt])
+  @@index([region])
+}
+
+model ProjectMedia {
+  id        String           @id @default(cuid())
+  projectId String
+  project   Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  mediaId   String
+  media     Media            @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  role      ProjectMediaRole @default(GALLERY)
+  sortOrder Int              @default(0)
+
+  @@unique([projectId, mediaId, role])
+  @@index([projectId, sortOrder])
+}
+
+model ProjectRevision {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  snapshot  Json
+  authorId  String?
+  author    User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+
+  @@index([projectId, createdAt])
+}
+
+// ---------------------------------------------------------------- leads (GDPR-sensitive)
+
+model Lead {
+  id                 String            @id @default(cuid())
+  name               String
+  email              String
+  phone              String?
+  postalCode         String
+  city               String?
+  region             Region?
+  projectType        String
+  message            String
+  budgetRange        String? // enum-like key, see src/lib/leads/options.ts
+  desiredTimeline    String? // enum-like key, see src/lib/leads/options.ts
+  desiredStartDate   String? // "YYYY-MM" or short free text (max 40), optional
+  source             String? // e.g. "contact", "service:renovation", "zone:manche"
+  consentAt          DateTime
+  consentTextVersion String
+  status             LeadStatus        @default(NEW)
+  internalNotes      String?
+  ipHash             String? // HMAC-SHA256(IP_HASH_SECRET, ip) — never the raw IP
+  userAgent          String? // truncated to 200 chars
+  mailDeliveryState  MailDeliveryState @default(NOT_CONFIGURED)
+  mailAttempts       Int               @default(0)
+  lastMailError      String? // sanitized, max 300 chars, never contains credentials
+  lastMailAttemptAt  DateTime?
+  attachments        LeadAttachment[]
+  retentionUntil     DateTime
+  deletedAt          DateTime? // soft-delete marker; purge job anonymises/deletes
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([status, createdAt])
+  @@index([retentionUntil])
+  @@index([deletedAt])
+}
+
+enum AttachmentKind {
+  IMAGE
+  DOCUMENT
+}
+
+// PRIVATE files: stored by getPrivateStorage() under PRIVATE_STORAGE_DIR, never
+// served by /media; only streamed by an authenticated admin route handler.
+model LeadAttachment {
+  id           String         @id @default(cuid())
+  leadId       String
+  lead         Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  storageKey   String         @unique
+  originalName String // sanitized
+  mime         String
+  sizeBytes    Int
+  kind         AttachmentKind
+  createdAt    DateTime       @default(now())
+
+  @@index([leadId])
+}
+
+// ---------------------------------------------------------------- navigation
+
+enum NavLocation {
+  HEADER
+  FOOTER_PRIMARY
+  FOOTER_LEGAL
+}
+
+model NavItem {
+  id           String      @id @default(cuid())
+  location     NavLocation
+  label        String
+  href         String? // used when pageId is null; validated (relative, https, mailto, tel)
+  pageId       String? // when set, href derives from the page path; hidden unless page is public
+  page         Page?       @relation(fields: [pageId], references: [id], onDelete: SetNull)
+  parentId     String? // one nesting level (dropdown) for HEADER
+  parent       NavItem?    @relation("NavTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children     NavItem[]   @relation("NavTree")
+  sortOrder    Int         @default(0)
+  openInNewTab Boolean     @default(false)
+  enabled      Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([location, sortOrder])
+}
+
+// ---------------------------------------------------------------- settings & redirects
+
+model Setting {
+  key         String   @id // see src/lib/settings.ts SETTING_KEYS
+  value       Json
+  updatedById String?
+  updatedBy   User?    @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+  updatedAt   DateTime @updatedAt
+}
+
+model Redirect {
+  id          String   @id @default(cuid())
+  fromPath    String   @unique // absolute path starting with "/", no query/host
+  toPath      String? // null only for 410
+  statusCode  Int      @default(301) // 301 | 302 | 308 | 410 (validated in app layer)
+  hits        Int      @default(0)
+  note        String?
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
