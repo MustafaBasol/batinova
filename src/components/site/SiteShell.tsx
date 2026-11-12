@@ -44,7 +44,7 @@ export async function SiteShell({ children }: { children: ReactNode }) {
           <Link href="/" aria-label="BatiNova Construction — accueil" className="flex-none">
             <Logo variant="color" priority overrides={logos} className="w-[8.75rem] min-[1180px]:w-[11rem]" />
           </Link>
-          <div className="flex items-center gap-8 xl:gap-12">
+          <div className="flex items-center gap-6 min-[1440px]:gap-12">
             <SiteNav items={headerItems} ctaHref="/devis" ctaLabel="Demander un devis" logos={logos} />
           </div>
         </div>

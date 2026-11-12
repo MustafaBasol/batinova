@@ -82,7 +82,7 @@ export function SiteNav({ items, ctaHref, ctaLabel, logos }: { items: NavLinkIte
     <>
       {/* Desktop */}
       <nav aria-label="Navigation principale" className="hidden min-[1180px]:block">
-        <ul className="flex items-center gap-x-8 xl:gap-x-10">
+        <ul className="flex items-center gap-x-6 min-[1360px]:gap-x-8 min-[1440px]:gap-x-10">
           {items.map((it) => (
             <li key={it.id} className="nav-item">
               <Link
