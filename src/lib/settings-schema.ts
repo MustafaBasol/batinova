@@ -133,7 +133,19 @@ export const AnalyticsSettings = z.object({
   requiresConsent: z.boolean().default(true),
 });
 
+/**
+ * Brand logo overrides. `null` = use the official static assets built from
+ * `assets/branding/*` (see src/components/site/brand-assets.ts). A Media id
+ * replaces that variant site-wide. Favicons stay build-time assets.
+ */
+export const BrandingSettings = z.object({
+  logoMediaId: z.string().max(64).nullable().default(null),
+  logoMonoMediaId: z.string().max(64).nullable().default(null),
+  logoOnDarkMediaId: z.string().max(64).nullable().default(null),
+});
+
 export const SETTINGS_SCHEMAS = {
+  branding: BrandingSettings,
   company: CompanySettings,
   address: AddressSettings,
   serviceAreas: ServiceAreaSettings,

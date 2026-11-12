@@ -1,5 +1,8 @@
 # Content requirements (owner directives, coordinator-maintained)
 
+## Brand assets (owner request 2026-11-12)
+Official web assets derived from the official logo: `assets/branding/logo_batinova_construction.png` (colour, primary), `logo_batinova_monochrome.png` (alternative on light/beige), `icone_batinova_minimaliste.png` (square icon). All verified RGBA with transparent background (2172×724, 2172×724, 1254×1254). `assets/batinova-logo-reference.jpeg` stays as source of truth. Dark backgrounds use a pure recolour (#F5F2EC) of the monochrome alpha mask. Favicons 16/32/48 (+ICO), Apple touch 180 (opaque #F5F2EC), manifest 192/512 + maskable 512, default OG 1200×630. Never stretch, crop artwork or redraw. Admin: settings `branding.{logoMediaId,logoMonoMediaId,logoOnDarkMediaId}` override (null = official). Organization JSON-LD `logo` uses the PNG colour logo (`ORG_LOGO` in `src/components/site/brand-assets.ts`).
+
 ## Rich text editor (owner request 2026-11-12)
 Blog articles (and the page `richText` block) use a WYSIWYG editor, not raw Markdown. Implementation: Tiptap (ProseMirror) editor in /admin, content stored as Tiptap JSON (`Post.body Json`), rendered on the public site by a server-side React renderer with a strict node/mark whitelist (no `dangerouslySetInnerHTML`, no raw HTML import; pasted HTML is normalised by the editor schema and re-validated server-side with zod before save).
 Toolbar (French labels + tooltips), all basic options:

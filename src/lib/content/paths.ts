@@ -32,6 +32,7 @@ export const RESERVED_SEGMENTS = new Set([
   "media",
   "blog",
   "realisations",
+  "devis",
   "_next",
   "sitemap.xml",
   "robots.txt",

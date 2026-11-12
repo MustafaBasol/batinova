@@ -1,13 +1,18 @@
-// Home — PLACEHOLDER. Owner: design-frontend (replace with the CMS-driven home,
-// i.e. getPublishedPageByPath("")).
+// Home: CMS page with path "" (design-frontend). Fetch + render only.
+import type { Metadata } from "next";
 import { SITE } from "@/lib/config/site";
+import { getPublishedPageByPath } from "@/lib/content/public";
+import { pageMetadata, renderPage } from "@/components/views/page-route";
 
-export default function HomePage() {
-  return (
-    <main className="min-h-screen flex flex-col items-center justify-center gap-2 p-8 text-center">
-      <h1 className="font-serif text-4xl text-charcoal">{SITE.name}</h1>
-      <p className="text-beige text-lg">{SITE.slogan}</p>
-      <p className="mt-6 text-sm text-charcoal/70">Site en cours de construction.</p>
-    </main>
-  );
+export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const page = await getPublishedPageByPath("");
+  if (!page) return { title: `${SITE.name} — ${SITE.slogan}` };
+  const meta = await pageMetadata("");
+  return { ...meta, title: { absolute: String(meta.title) } };
+}
+
+export default async function HomePage() {
+  return renderPage("");
 }
