@@ -3,7 +3,7 @@ import path from "node:path";
 import { expect, type BrowserContext, type Page } from "@playwright/test";
 
 export const root = path.resolve(import.meta.dirname, "../..");
-export const creds = JSON.parse(readFileSync(path.join(root, ".tmp", "e2e", "creds.json"), "utf8")) as Record<"owner" | "editor" | "lockout", { email: string; password: string }>;
+export const creds = JSON.parse(readFileSync(path.join(root, ".tmp", "e2e", "creds.json"), "utf8")) as Record<"owner" | "editor" | "lockout", { email: string; password: string }> & { databaseUrl: string };
 
 let n = 0;
 /** Unique fake client IP per call: TRUST_PROXY=true on the E2E server => isolated rate-limit buckets. */

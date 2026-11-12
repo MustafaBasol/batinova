@@ -11,7 +11,7 @@ const secret = z.string().min(32, "must be at least 32 characters");
 
 const EnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  DATABASE_URL: z.string().min(1).default("file:./prisma/dev.db"),
+  DATABASE_URL: z.string().min(1).default("mysql://root@127.0.0.1:3306/batinova_dev"),
   SESSION_SECRET: secret,
   IP_HASH_SECRET: secret,
   MEDIA_STORAGE_DIR: z.string().min(1).default("./storage/media"),

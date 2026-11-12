@@ -31,7 +31,11 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error("[seed] failed:", err instanceof Error ? err.message : err);
-  process.exit(1);
-});
+// Explicit exit: the media seed uses the app's pooled client (src/lib/db), whose open pool would keep the process alive.
+main().then(
+  () => process.exit(0),
+  (err) => {
+    console.error("[seed] failed:", err instanceof Error ? err.message : err);
+    process.exit(1);
+  },
+);

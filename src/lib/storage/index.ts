@@ -1,8 +1,10 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
-import path from "node:path";
 import type { StorageDriver } from "./driver";
 import { LocalDiskDriver } from "./local-disk";
+import { storageRoots } from "./roots";
+import { s3ConfigFromEnv, storageDriverKind } from "./config";
+import { S3Driver } from "./s3";
 
 export * from "./driver";
 export { LocalDiskDriver } from "./local-disk";
@@ -16,31 +18,20 @@ export { LocalDiskDriver } from "./local-disk";
 let publicDriver: StorageDriver | null = null;
 let privateDriver: StorageDriver | null = null;
 
-function roots() {
-  const pub = path.resolve(/*turbopackIgnore: true*/ process.env.MEDIA_STORAGE_DIR || "./storage/media");
-  const priv = path.resolve(/*turbopackIgnore: true*/ process.env.PRIVATE_STORAGE_DIR || "./storage/private");
-  const inside = (a: string, b: string) => {
-    const rel = path.relative(b, a);
-    return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
-  };
-  if (inside(pub, priv) || inside(priv, pub)) {
-    throw new Error("MEDIA_STORAGE_DIR and PRIVATE_STORAGE_DIR must be separate, non-nested directories.");
-  }
-  if (inside(priv, path.resolve(/*turbopackIgnore: true*/ "public")) || inside(pub, path.resolve(/*turbopackIgnore: true*/ "public"))) {
-    throw new Error("Storage directories must not live inside /public.");
-  }
-  return { pub, priv };
-}
+const roots = storageRoots;
 
 export function getPublicStorage(): StorageDriver {
-  publicDriver ??= new LocalDiskDriver(roots().pub);
+  publicDriver ??= storageDriverKind() === "s3" ? new S3Driver(s3ConfigFromEnv(), "media") : new LocalDiskDriver(roots().pub);
   return publicDriver;
 }
 
 export function getPrivateStorage(): StorageDriver {
-  privateDriver ??= new LocalDiskDriver(roots().priv);
+  privateDriver ??= storageDriverKind() === "s3" ? new S3Driver(s3ConfigFromEnv(), "private") : new LocalDiskDriver(roots().priv);
   return privateDriver;
 }
+
+export { storageDriverKind } from "./config";
+export { storageRoots } from "./roots";
 
 /** Test helper. */
 export function resetStorageDrivers(): void {

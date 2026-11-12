@@ -77,12 +77,11 @@ export async function attemptLogin(input: LoginInput): Promise<LoginResult> {
 
   const valid = await verifyPassword(user.passwordHash, password);
   if (!valid) {
-    const failed = user.failedLoginCount + 1;
+    // Atomic increment: concurrent failed attempts must all be counted (no read-modify-write race on MySQL).
+    const bumped = await db.user.update({ where: { id: user.id }, data: { failedLoginCount: { increment: 1 } }, select: { failedLoginCount: true } });
+    const failed = bumped.failedLoginCount;
     const lockMs = lockDurationMs(failed);
-    await db.user.update({
-      where: { id: user.id },
-      data: { failedLoginCount: failed, lockedUntil: lockMs ? new Date(now.getTime() + lockMs) : null },
-    });
+    if (lockMs) await db.user.update({ where: { id: user.id }, data: { lockedUntil: new Date(now.getTime() + lockMs) } });
     await audit(user.id, "auth.login_failed", { type: "User", id: user.id }, { count: failed, locked: lockMs > 0 });
     return { ok: false, error: GENERIC_LOGIN_ERROR, reason: "invalid" };
   }

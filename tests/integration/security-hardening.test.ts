@@ -86,13 +86,38 @@ describe("client IP / TRUST_PROXY", () => {
   });
 });
 
+describe("client IP with TRUST_PROXY_HOPS / CLIENT_IP_HEADER", () => {
+  const h = (o: Record<string, string>) => new Headers(o);
+  it("takes the Nth entry from the right (default 1 hop) and ignores forged left entries", () => {
+    vi.stubEnv("TRUST_PROXY", "true");
+    resetServerEnvCache();
+    expect(getClientIp(h({ "x-forwarded-for": "6.6.6.6, 203.0.113.5" }))).toBe("203.0.113.5");
+    vi.stubEnv("TRUST_PROXY_HOPS", "2");
+    expect(getClientIp(h({ "x-forwarded-for": "6.6.6.6, 203.0.113.5, 10.1.1.1" }))).toBe("203.0.113.5");
+    // fewer entries than trusted hops => the request skipped a proxy: do not trust it
+    expect(getClientIp(h({ "x-forwarded-for": "6.6.6.6" }))).toBe("unknown");
+  });
+  it("uses an allow-listed CLIENT_IP_HEADER only, and never when TRUST_PROXY is false", () => {
+    vi.stubEnv("TRUST_PROXY", "true");
+    vi.stubEnv("CLIENT_IP_HEADER", "cf-connecting-ip");
+    resetServerEnvCache();
+    expect(getClientIp(h({ "cf-connecting-ip": "198.51.100.4", "x-forwarded-for": "6.6.6.6" }))).toBe("198.51.100.4");
+    expect(getClientIp(h({ "x-forwarded-for": "6.6.6.6" }))).toBe("unknown");
+    vi.stubEnv("CLIENT_IP_HEADER", "x-evil");
+    expect(getClientIp(h({ "x-evil": "1.2.3.4", "x-forwarded-for": "198.51.100.9" }))).toBe("198.51.100.9");
+    vi.stubEnv("TRUST_PROXY", "false");
+    resetServerEnvCache();
+    expect(getClientIp(h({ "cf-connecting-ip": "198.51.100.4" }))).toBe("unknown");
+  });
+});
+
 describe("production environment validation", () => {
   const good = {
     NODE_ENV: "production",
     SESSION_SECRET: "k3Jd9sLm2PqRt7VxZb4NcF8gHw1YuAe6",
     IP_HASH_SECRET: "Qw8ErTy3UiOp5AsDf7GhJk9LzXc2VbNm",
     SITE_URL: "https://btnv.fr",
-    DATABASE_URL: "file:/data/db/batinova.db",
+    DATABASE_URL: "mysql://u123_batinova:s3cr%40t-pw@127.0.0.1:3306/u123_batinova",
     MEDIA_STORAGE_DIR: "/data/media",
     PRIVATE_STORAGE_DIR: "/data/private",
     TRUST_PROXY: "false",
@@ -122,13 +147,41 @@ describe("production environment validation", () => {
     expect(productionEnvProblems({ ...good, SITE_URL: "https://btnv.fr/blog" }).join()).toMatch(/bare origin/);
   });
 
-  it("requires absolute persistent-looking storage/DB paths unless the local escape hatch is set", () => {
-    const rel = { ...good, DATABASE_URL: "file:./prisma/dev.db", MEDIA_STORAGE_DIR: "./storage/media", PRIVATE_STORAGE_DIR: undefined };
+  it("requires absolute persistent storage paths unless the local escape hatch is set", () => {
+    const rel = { ...good, MEDIA_STORAGE_DIR: "./storage/media", PRIVATE_STORAGE_DIR: undefined };
     const p = productionEnvProblems(rel).join(" ");
-    expect(p).toMatch(/DATABASE_URL/);
     expect(p).toMatch(/MEDIA_STORAGE_DIR/);
     expect(p).toMatch(/PRIVATE_STORAGE_DIR/);
     expect(productionEnvProblems({ ...rel, ALLOW_EPHEMERAL_PATHS: "true" })).toEqual([]);
+  });
+
+  it("refuses storage inside the Hostinger-managed deployment folders and identical roots", () => {
+    expect(productionEnvProblems({ ...good, MEDIA_STORAGE_DIR: "/home/u1/domains/btnv.fr/hbuilds/current/media" }).join()).toMatch(/hbuilds/);
+    expect(productionEnvProblems({ ...good, PRIVATE_STORAGE_DIR: "/home/u1/domains/btnv.fr/public_html/private" }).join()).toMatch(/public_html/);
+    expect(productionEnvProblems({ ...good, PRIVATE_STORAGE_DIR: good.MEDIA_STORAGE_DIR }).join()).toMatch(/must differ/);
+  });
+
+  it("validates DATABASE_URL: mysql:// on 127.0.0.1 with a password, never SQLite or localhost", () => {
+    expect(productionEnvProblems({ ...good, DATABASE_URL: "file:/data/db/batinova.db" }).join()).toMatch(/DATABASE_URL.*mysql/);
+    expect(productionEnvProblems({ ...good, DATABASE_URL: undefined }).join()).toMatch(/DATABASE_URL/);
+    expect(productionEnvProblems({ ...good, DATABASE_URL: "mysql://u:p@localhost:3306/db" }).join()).toMatch(/127\.0\.0\.1/);
+    expect(productionEnvProblems({ ...good, DATABASE_URL: "mysql://u:p@db.example.net:3306/db" }).join()).toMatch(/127\.0\.0\.1/);
+    expect(productionEnvProblems({ ...good, DATABASE_URL: "mysql://u@127.0.0.1:3306/db" }).join()).toMatch(/password/);
+    const msg = productionEnvProblems({ ...good, DATABASE_URL: "mysql://u:topsecret@localhost/db" }).join();
+    expect(msg).not.toContain("topsecret");
+  });
+
+  it("validates MAINTENANCE_TOKEN, proxy settings and indexing origin", () => {
+    expect(productionEnvProblems({ ...good, MAINTENANCE_TOKEN: "short" }).join()).toMatch(/MAINTENANCE_TOKEN/);
+    expect(productionEnvProblems({ ...good, MAINTENANCE_TOKEN: good.SESSION_SECRET }).join()).toMatch(/must differ/);
+    expect(productionEnvProblems({ ...good, MAINTENANCE_TOKEN: "Zk3Jd9sLm2PqRt7VxZb4NcF8gHw1YuAe6QwErTy" })).toEqual([]);
+    expect(productionEnvProblems({ ...good, TRUST_PROXY_HOPS: "9" }).join()).toMatch(/TRUST_PROXY_HOPS/);
+    expect(productionEnvProblems({ ...good, CLIENT_IP_HEADER: "x-evil" }).join()).toMatch(/CLIENT_IP_HEADER/);
+    expect(productionEnvProblems({ ...good, SITE_URL: "https://preview.example.net", SITE_INDEXING: "true" }).join()).toMatch(/SITE_INDEXING/);
+    expect(productionEnvProblems({ ...good, STORAGE_DRIVER: "ftp" }).join()).toMatch(/STORAGE_DRIVER/);
+    const s3 = productionEnvProblems({ ...good, STORAGE_DRIVER: "s3", MEDIA_STORAGE_DIR: undefined, PRIVATE_STORAGE_DIR: undefined }).join();
+    expect(s3).toMatch(/S3_BUCKET/);
+    expect(s3).not.toMatch(/MEDIA_STORAGE_DIR/);
   });
 
   it("rejects an invalid TRUST_PROXY value", () => {

@@ -1,8 +1,9 @@
 import path from "node:path";
 import { defineConfig } from "vitest/config";
+import { testDatabaseUrl } from "./tests/support/mysql";
 
 // Owner: architect-security. Conservative concurrency (shared dev workstation);
-// integration tests share one isolated SQLite file, so files run sequentially.
+// integration tests share one isolated MySQL/MariaDB test database (TEST_DATABASE_URL), so files run sequentially.
 export default defineConfig({
   resolve: {
     alias: {
@@ -21,7 +22,7 @@ export default defineConfig({
     hookTimeout: 60_000,
     env: {
       NODE_ENV: "test",
-      DATABASE_URL: "file:./prisma/test-vitest.db",
+      DATABASE_URL: testDatabaseUrl(),
       SESSION_SECRET: "test-session-secret-0123456789-abcdefghijklmnop",
       IP_HASH_SECRET: "test-iphash-secret-0123456789-abcdefghijklmnopq",
       MEDIA_STORAGE_DIR: "./.tmp/test-storage/media",

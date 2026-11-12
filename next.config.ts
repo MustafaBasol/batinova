@@ -63,7 +63,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   // Native modules must not be bundled.
-  serverExternalPackages: ["better-sqlite3", "@node-rs/argon2", "sharp", "nodemailer"],
+  serverExternalPackages: ["mariadb", "@node-rs/argon2", "sharp", "nodemailer"],
   images: {
     // CMS media is served by our own route handler at /media/<key>.
     localPatterns: [{ pathname: "/media/**" }, { pathname: "/images/**" }],

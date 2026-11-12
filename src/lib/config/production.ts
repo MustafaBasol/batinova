@@ -1,4 +1,6 @@
 import path from "node:path";
+import { parseDatabaseUrl } from "@/lib/db-url";
+import { s3Problems, storageDriverKind } from "@/lib/storage/config";
 
 /**
  * Production environment validation (owner: architect-security). Pure (no I/O, no secrets in
@@ -44,14 +46,49 @@ export function productionEnvProblems(env: Record<string, string | undefined>): 
     bad("TRUST_PROXY", 'must be "true" or "false"');
   }
 
-  if (env.ALLOW_EPHEMERAL_PATHS !== "true") {
-    const db = env.DATABASE_URL ?? "";
-    if (!db.startsWith("file:")) bad("DATABASE_URL", "must be a file: URL (SQLite) on a persistent volume");
-    else if (!path.isAbsolute(db.slice("file:".length).split("?")[0] ?? "")) bad("DATABASE_URL", "must be an absolute path on a persistent volume");
+  const hops = env.TRUST_PROXY_HOPS;
+  if (hops !== undefined && !/^[1-5]$/.test(hops)) bad("TRUST_PROXY_HOPS", "must be an integer between 1 and 5");
+  const ipHeader = env.CLIENT_IP_HEADER;
+  if (ipHeader && !["x-real-ip", "cf-connecting-ip", "true-client-ip", "x-client-ip"].includes(ipHeader.toLowerCase())) {
+    bad("CLIENT_IP_HEADER", "must be one of x-real-ip, cf-connecting-ip, true-client-ip, x-client-ip");
+  }
+  if (env.MAINTENANCE_TOKEN) {
+    const why = isWeakSecret(env.MAINTENANCE_TOKEN);
+    if (why) bad("MAINTENANCE_TOKEN", why);
+    if (env.MAINTENANCE_TOKEN === env.SESSION_SECRET || env.MAINTENANCE_TOKEN === env.IP_HASH_SECRET) bad("MAINTENANCE_TOKEN", "must differ from the other secrets");
+  }
+  if (env.SITE_INDEXING === "true" && env.SITE_URL && env.SITE_URL !== "https://btnv.fr" && env.ALLOW_EPHEMERAL_PATHS !== "true") {
+    bad("SITE_INDEXING", "may be true only for the canonical origin https://btnv.fr (previews must stay noindex)");
+  }
+
+  // Database: Hostinger MySQL. Node.js apps must use 127.0.0.1 ("localhost" resolves to ::1 and is refused).
+  try {
+    const cfg = parseDatabaseUrl(env.DATABASE_URL);
+    const local = cfg.host === "127.0.0.1" || cfg.host === "::1";
+    if (cfg.host === "localhost") bad("DATABASE_URL", 'host must be 127.0.0.1, not "localhost" (Node resolves it to ::1)');
+    else if (!local && env.ALLOW_EPHEMERAL_PATHS !== "true" && env.ALLOW_REMOTE_DATABASE !== "true") {
+      bad("DATABASE_URL", "host must be 127.0.0.1 (set ALLOW_REMOTE_DATABASE=true only for a deliberate remote MySQL with TLS)");
+    }
+    if (!cfg.password && env.ALLOW_EPHEMERAL_PATHS !== "true") bad("DATABASE_URL", "must include a password");
+  } catch (e) {
+    // parseDatabaseUrl messages never contain the URL or password.
+    bad("DATABASE_URL", e instanceof Error ? e.message : "is invalid");
+  }
+
+  if (env.STORAGE_DRIVER !== undefined && env.STORAGE_DRIVER !== "local" && env.STORAGE_DRIVER !== "s3") {
+    bad("STORAGE_DRIVER", 'must be "local" or "s3"');
+  }
+  if (storageDriverKind(env) === "s3") problems.push(...s3Problems(env));
+
+  if (storageDriverKind(env) === "local" && env.ALLOW_EPHEMERAL_PATHS !== "true") {
     for (const name of ["MEDIA_STORAGE_DIR", "PRIVATE_STORAGE_DIR"] as const) {
       const v = env[name];
       if (!v) bad(name, "is required in production");
-      else if (!path.isAbsolute(v)) bad(name, "must be an absolute path on a persistent volume");
+      else if (!path.isAbsolute(v)) bad(name, "must be an absolute path on a persistent volume outside the deployment folders");
+      else if (/(^|\/)(hbuilds|public_html)(\/|$)/.test(v)) bad(name, "must not be inside hbuilds/ or public_html/ (overwritten on every deployment)");
+    }
+    if (env.MEDIA_STORAGE_DIR && env.PRIVATE_STORAGE_DIR && env.MEDIA_STORAGE_DIR === env.PRIVATE_STORAGE_DIR) {
+      bad("PRIVATE_STORAGE_DIR", "must differ from MEDIA_STORAGE_DIR");
     }
   }
   return problems;

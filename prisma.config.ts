@@ -17,7 +17,7 @@ export default defineConfig({
     seed: "tsx --conditions=react-server prisma/seed/index.ts",
   },
   datasource: {
-    // SQLite path is resolved relative to the project root (process cwd).
-    url: process.env.DATABASE_URL ?? "file:./prisma/dev.db",
+    // mysql://USER:PASSWORD@127.0.0.1:3306/DATABASE (Hostinger MySQL). Required for migrate commands.
+    url: process.env.DATABASE_URL ?? "mysql://root@127.0.0.1:3306/batinova_dev",
   },
 });
