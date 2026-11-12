@@ -45,3 +45,24 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - run: npm audit --omit=dev
+  # Hostinger installs production dependencies only: prove build:hostinger's tooling exists in that mode.
+  # No database service and no secrets: deploy:setup must stop at its env validation before any DB access.
+  prod-install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --omit=dev
+        env:
+          NODE_ENV: production
+      - run: node scripts/verify-prod-deps.mjs
+        env:
+          NODE_ENV: production
+      - run: npx next build
+        env:
+          NODE_ENV: production
+          SITE_URL: https://btnv.fr

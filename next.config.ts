@@ -60,6 +60,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // `next build` type-checks with the production-safe config (no test files => no vitest/playwright needed on the
+  // Hostinger build host). `npm run typecheck` still checks everything with tsconfig.json.
+  typescript: { tsconfigPath: "tsconfig.build.json" },
   poweredByHeader: false,
   reactStrictMode: true,
   // Native modules must not be bundled.
