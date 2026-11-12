@@ -30,18 +30,26 @@ function step(label: string, args: string[]) {
 
 async function main() {
   const { createScriptClient } = await import("../prisma/seed/client");
+  const { parseDatabaseUrl, toConnectionOptions } = await import("../src/lib/db-url");
+  const mariadb = await import("mariadb");
+  const cfg = parseDatabaseUrl(process.env.DATABASE_URL);
+  // GET_LOCK is bound to ONE connection: hold it on a dedicated connection that stays open for the whole setup
+  // (a pooled client could release/acquire on different connections). The lock disappears if this process dies.
+  let lockConn: Awaited<ReturnType<typeof mariadb.createConnection>> | null = null;
   const db = createScriptClient();
   let locked = false;
   try {
     try {
-      await db.$queryRaw`SELECT 1`;
+      lockConn = await mariadb.createConnection({ ...toConnectionOptions(cfg), connectTimeout: 10_000 });
+      await lockConn.query("SELECT 1");
     } catch {
       throw new Error("database unreachable (check DATABASE_URL: host must be 127.0.0.1) — aborting before any change");
     }
     console.log("[deploy:setup] database reachable");
-    const got = await db.$queryRaw<{ ok: number | bigint | null }[]>`SELECT GET_LOCK(${LOCK}, 120) AS ok`;
+    const got = (await lockConn.query("SELECT GET_LOCK(?, 120) AS ok", [LOCK])) as { ok: number | bigint | null }[];
     locked = Number(got[0]?.ok) === 1;
-    if (!locked) throw new Error("another deployment setup is running (lock busy)");
+    if (!locked) throw new Error("another deployment setup is running (lock busy after 120 s)");
+    console.log("[deploy:setup] deployment lock acquired");
 
     step("migrate deploy", [path.join(root, "node_modules/prisma/build/index.js"), "migrate", "deploy"]);
     step("seed (create-if-missing)", [path.join(root, "node_modules/tsx/dist/cli.mjs"), "--conditions=react-server", "prisma/seed/index.ts"]);
@@ -52,7 +60,10 @@ async function main() {
     if (b.warning) console.log(`[deploy:setup] WARNING: ${b.warning}`);
     if (b.result === "invalid") throw new Error("invalid BOOTSTRAP_OWNER_* configuration");
   } finally {
-    if (locked) await db.$queryRaw`SELECT RELEASE_LOCK(${LOCK})`.catch(() => undefined);
+    if (lockConn) {
+      if (locked) await lockConn.query("SELECT RELEASE_LOCK(?)", [LOCK]).catch(() => undefined);
+      await lockConn.end().catch(() => undefined);
+    }
     await db.$disconnect();
   }
 }

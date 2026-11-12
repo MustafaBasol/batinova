@@ -24,7 +24,7 @@ if (!/test/i.test(dbName) || !["127.0.0.1", "localhost"].includes(dbu.hostname))
 }
 {
   const mariadb = createRequire(import.meta.url)("mariadb");
-  const conn = await mariadb.createConnection({ host: dbu.hostname, port: Number(dbu.port || 3306), user: decodeURIComponent(dbu.username), password: decodeURIComponent(dbu.password) });
+  const conn = await mariadb.createConnection({ host: dbu.hostname, port: Number(dbu.port || 3306), user: decodeURIComponent(dbu.username), password: decodeURIComponent(dbu.password), allowPublicKeyRetrieval: true });
   await conn.query(`DROP DATABASE IF EXISTS \`${dbName}\``);
   await conn.query(`CREATE DATABASE \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
   await conn.end();

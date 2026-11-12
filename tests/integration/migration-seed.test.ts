@@ -1,13 +1,13 @@
 // Fresh-install pipeline on an EMPTY MySQL/MariaDB database (owner: qa-release): migrate deploy -> seed -> seed again.
 // Proves the baseline migration matches schema.prisma (no drift), the seed is idempotent and never overwrites edits,
 // and that deploy-setup + owner bootstrap are safe to re-run. Uses its own throwaway database (name contains "test").
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import * as mariadb from "mariadb";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { parseDatabaseUrl } from "@/lib/db-url";
+import { parseDatabaseUrl, toConnectionOptions } from "@/lib/db-url";
 import { dropDatabase, recreateDatabase, testDatabaseUrl } from "../support/mysql";
 import { hashPassword } from "@/lib/auth/password";
 
@@ -34,7 +34,7 @@ const tsx = (...a: string[]) => node([path.join(root, "node_modules/tsx/dist/cli
 
 async function counts(): Promise<Record<string, number>> {
   const c = parseDatabaseUrl(url);
-  const conn = await mariadb.createConnection({ host: c.host, port: c.port, user: c.user, password: c.password, database: c.database });
+  const conn = await mariadb.createConnection(toConnectionOptions(c));
   try {
     const tables = (await conn.query("SHOW TABLES")) as Record<string, string>[];
     const out: Record<string, number> = {};
@@ -50,7 +50,7 @@ async function counts(): Promise<Record<string, number>> {
 }
 async function sql<T = Record<string, unknown>>(q: string): Promise<T[]> {
   const c = parseDatabaseUrl(url);
-  const conn = await mariadb.createConnection({ host: c.host, port: c.port, user: c.user, password: c.password, database: c.database });
+  const conn = await mariadb.createConnection(toConnectionOptions(c));
   try {
     return Array.from((await conn.query(q)) as T[]);
   } finally {
@@ -99,6 +99,57 @@ describe("fresh MySQL install", () => {
     expect((await counts()).User).toBe(1);
     expect((await sql<{ role: string }>("SELECT role FROM `User`"))[0]!.role).toBe("OWNER");
   }, 300_000);
+
+  it("two concurrent deployments serialise on the lock: both succeed, no duplicate OWNER or rows", async () => {
+    const before = await counts();
+    const hash = await hashPassword("a long enough bootstrap password");
+    const runs = await Promise.all(
+      [1, 2].map(
+        () =>
+          new Promise<{ code: number | null; out: string }>((resolve) => {
+            const child = spawn(process.execPath, [path.join(root, "node_modules/tsx/dist/cli.mjs"), "--conditions=react-server", "scripts/deploy-setup.ts"], {
+              cwd: root,
+              env: env({ BOOTSTRAP_OWNER_EMAIL: "owner@example.test", BOOTSTRAP_OWNER_PASSWORD_HASH: hash }),
+            });
+            let out = "";
+            child.stdout.on("data", (d) => (out += d));
+            child.stderr.on("data", (d) => (out += d));
+            child.on("close", (code) => resolve({ code, out }));
+          }),
+      ),
+    );
+    expect(runs.map((r) => r.code)).toEqual([0, 0]);
+    expect(runs.every((r) => /deployment lock acquired/.test(r.out))).toBe(true);
+    expect(await counts()).toEqual(before);
+    expect(runs.map((r) => r.out).join("")).not.toContain(hash);
+  }, 300_000);
+
+  it("a wrong database password never appears in migrate/setup output", () => {
+    const secret = "Sup3rS3cretPw-DoNotLeak";
+    const u = new URL(url);
+    u.password = secret;
+    let out = "";
+    try {
+      prisma("migrate", "deploy");
+    } catch {
+      /* the healthy URL passes; the next call uses the wrong password */
+    }
+    try {
+      node([path.join(root, "node_modules/prisma/build/index.js"), "migrate", "deploy"], { DATABASE_URL: u.toString() });
+    } catch (e) {
+      const err = e as { stdout?: string; stderr?: string };
+      out = `${err.stdout ?? ""}${err.stderr ?? ""}`;
+    }
+    expect(out.length).toBeGreaterThan(0); // it must fail
+    expect(out).not.toContain(secret);
+    try {
+      node([path.join(root, "node_modules/tsx/dist/cli.mjs"), "--conditions=react-server", "scripts/deploy-setup.ts"], { DATABASE_URL: u.toString() });
+    } catch (e) {
+      const err = e as { stdout?: string; stderr?: string };
+      out = `${err.stdout ?? ""}${err.stderr ?? ""}`;
+    }
+    expect(out).not.toContain(secret);
+  }, 120_000);
 
   it("deploy:setup aborts BEFORE touching anything when the database is unreachable", () => {
     let err: { status?: number; stderr?: string; stdout?: string } = {};

@@ -44,16 +44,26 @@ export function parseDatabaseUrl(raw: string | undefined): DbConnectionConfig {
   };
 }
 
-/** Options for `new PrismaMariaDb(...)`. UTC everywhere: the app stores and reads UTC instants. */
-export function toAdapterConfig(c: DbConnectionConfig) {
+/**
+ * Connection options for the `mariadb` driver. MySQL 8 authenticates with caching_sha2_password; without TLS the
+ * driver needs `allowPublicKeyRetrieval`. That is acceptable ONLY on the loopback interface (Hostinger: 127.0.0.1),
+ * where the exchange never leaves the machine; for any other host TLS (`ssl=true`) is required instead.
+ */
+export function toConnectionOptions(c: DbConnectionConfig) {
+  const loopback = c.host === "127.0.0.1" || c.host === "::1";
   return {
     host: c.host,
     port: c.port,
     user: c.user,
     password: c.password,
     database: c.database,
-    connectionLimit: c.connectionLimit,
     timezone: "Z",
+    allowPublicKeyRetrieval: loopback,
     ...(c.ssl ? { ssl: true } : {}),
   };
+}
+
+/** Options for `new PrismaMariaDb(...)`. UTC everywhere: the app stores and reads UTC instants. */
+export function toAdapterConfig(c: DbConnectionConfig) {
+  return { ...toConnectionOptions(c), connectionLimit: c.connectionLimit };
 }

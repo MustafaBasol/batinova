@@ -10,6 +10,7 @@ Nothing here has been deployed. Hostinger database creation, DNS and environment
 | Hosting | Hostinger **Business Web Hosting**, managed Node.js Web App (GitHub deployment), Node 24 |
 | Database | **Hostinger MySQL** (MariaDB-compatible) through Prisma 7 + `@prisma/adapter-mariadb` |
 | Files | `STORAGE_DRIVER=local` on a **verified persistent directory outside `hbuilds/` and `public_html/`**, or `STORAGE_DRIVER=s3` (S3-compatible bucket; provider = owner decision) |
+| Compatibility | tested on MariaDB 10.11 **and MySQL 8.0** (full suite incl. migrate/seed/drift). MySQL 8 needs `allowPublicKeyRetrieval` without TLS: enabled automatically on 127.0.0.1 only. Tables are pinned to `utf8mb4_unicode_ci`, independent of the database default (tested on a latin1 database) |
 | Instances | one app process (rate limits are DB-backed and atomic, so several would work, but local files need one) |
 
 SQLite was removed. Its history is archived in `docs/archive/sqlite-migrations/` (not portable); `prisma/migrations/`
@@ -69,13 +70,11 @@ previous version still serves. `npm run db:reset` needs `ALLOW_DB_RESET=true`, a
   knows the storage → **the app refuses to start** (wiped / unmounted directory) instead of silently serving an empty library or
   losing attachments. Fresh install (no record) → markers are created automatically. A restore must bring the markers back with the
   files (the backup scripts do), and a database-only restore will be refused until the matching files are restored.
-- **Canary test (do this before go-live, on Hostinger):**
-  1. set the env vars, deploy, open the site once (markers are created);
-  2. stamp: `npm run storage:canary -- write` (SSH or one-shot cron: `node --import tsx …` is not needed, see §8 for the cron form);
-  3. push any trivial commit to GitHub → wait for redeploy #2 → push another → redeploy #3 (the first build folder is now pruned);
-  4. verify: `npm run storage:canary -- check` must print `marker=present canaries>=1 OK` for both roots, and the site must still
-     serve an uploaded image and an existing lead attachment.
-  If any step fails, do **not** use the directory: switch to §4b.
+- **Canary test (before go-live, on Hostinger, disposable data only): `docs/HOSTINGER_PERSISTENCE_TEST.md`.** It needs **no SSH and no
+  npm on the server**: the token-protected `POST /api/maintenance/storage-canary` (`write|check|cycle|cleanup`) writes/reads/deletes/recreates
+  test objects as the running app and records a hash of the release folder, so `check` after two redeployments can state
+  `twoRedeploysProven:true`. (`npm run storage:canary -- write|check` is the equivalent when a shell with Node exists.)
+  **Status: not run.** Until it passes, local storage is unproven and production stays blocked; if it fails → §4b (S3).
 - Backups: §9. Permissions: `chmod 700` on both roots, nothing world-readable.
 
 ### 4b. S3-compatible driver (if persistence cannot be proven)
@@ -111,6 +110,10 @@ identical media/private roots, incomplete S3 settings, weak `MAINTENANCE_TOKEN`,
 non-canonical origin. Messages name variables, never values.
 
 ## 6. First installation (no public registration endpoint)
+
+> **Viability on Hostinger is UNPROVEN.** Whether the managed build environment reaches `127.0.0.1:3306`, keeps devDependencies and
+> sees the environment variables must be measured with `npm run deploy:probe` in a test deployment (`docs/HOSTINGER_PERSISTENCE_TEST.md` §D)
+> before `build:hostinger` is trusted. Fallbacks are described below.
 
 Build command to configure in Hostinger (Build Settings): **`npm run build:hostinger`**
 (= `prisma generate` → `npm run deploy:setup` → `next build`); start command stays `npm run start`.

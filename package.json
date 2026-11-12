@@ -12,6 +12,7 @@
     "build:hostinger": "prisma generate && npm run deploy:setup && next build",
     "deploy:setup": "tsx --conditions=react-server scripts/deploy-setup.ts",
     "db:status": "prisma migrate status",
+    "deploy:probe": "tsx --conditions=react-server scripts/deploy-probe.ts",
     "admin:hash": "tsx --conditions=react-server scripts/admin-hash.ts",
     "start": "next start",
     "lint": "eslint .",

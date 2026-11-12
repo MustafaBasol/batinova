@@ -38,7 +38,7 @@ DUMP="$(command -v mariadb-dump || command -v mysqldump)"
 "$DUMP" --defaults-extra-file="$CNF" --single-transaction "$DB_NAME" | gzip -9 > "$ASIDE/db.sql.gz" || true
 
 # Empty the database (drop tables, keep the database + grants: Hostinger users cannot always DROP DATABASE).
-TABLES="$("$CLIENT" --defaults-extra-file="$CNF" -N -e "SELECT GROUP_CONCAT(CONCAT('\`',table_name,'\`')) FROM information_schema.tables WHERE table_schema='$DB_NAME'")"
+TABLES="$("$CLIENT" --defaults-extra-file="$CNF" -N -e "SET SESSION group_concat_max_len=1000000; SELECT GROUP_CONCAT(CONCAT('\`',table_name,'\`')) FROM information_schema.tables WHERE table_schema='$DB_NAME'")"
 if [ -n "$TABLES" ] && [ "$TABLES" != "NULL" ]; then
   "$CLIENT" --defaults-extra-file="$CNF" "$DB_NAME" -e "SET FOREIGN_KEY_CHECKS=0; DROP TABLE $TABLES; SET FOREIGN_KEY_CHECKS=1;"
 fi
