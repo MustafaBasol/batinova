@@ -14,6 +14,7 @@ import { CmsError, parseOrThrow, runAction, type ActionResult } from "@/lib/cms/
 import { saveCategory, saveTag } from "@/lib/cms/taxonomy";
 import { purge, restoreFromTrash, softDelete } from "@/lib/cms/trash";
 import { audit } from "@/lib/security/audit";
+import { invalidateRedirectCache } from "@/lib/seo/redirects";
 
 /**
  * Content Server Actions (owner: cms-admin). Each action: requireRole -> zod -> lib -> audit.
@@ -145,13 +146,13 @@ export async function saveNavAction(input: unknown): Promise<ActionResult> {
 export async function saveRedirectAction(input: unknown): Promise<ActionResult<{ id: string }>> {
   const user = await requireRole("EDITOR"); // 410 is further restricted to OWNER inside saveRedirect
   const r = await runAction(() => saveRedirect(user, input), "Redirection enregistrée.");
-  if (r.ok) revalidatePath("/admin/redirections");
+  if (r.ok) { invalidateRedirectCache(); revalidatePath("/admin/redirections"); }
   return r;
 }
 
 export async function deleteRedirectAction(id: string): Promise<ActionResult> {
   const user = await requireRole("OWNER");
   const r = await runAction(() => deleteRedirect(user, String(id)), "Redirection supprimée.");
-  if (r.ok) revalidatePath("/admin/redirections");
+  if (r.ok) { invalidateRedirectCache(); revalidatePath("/admin/redirections"); }
   return r;
 }

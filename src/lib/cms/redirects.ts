@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { audit } from "@/lib/security/audit";
+import { invalidateRedirectCache } from "@/lib/seo/redirects";
 import { isSafeInternalPath, isSafeHref } from "@/lib/security/href";
 import { CmsError } from "./result";
 
@@ -39,6 +40,7 @@ export async function wouldLoop(from: string, to: string, ignoreId?: string): Pr
 /** A piece of content now lives at `url`: any redirect FROM that url would shadow it -> remove. */
 export async function clearRedirectFrom(url: string): Promise<void> {
   await db.redirect.deleteMany({ where: { fromPath: url } });
+  invalidateRedirectCache();
 }
 
 /**
@@ -56,6 +58,7 @@ export async function recordMove(oldUrl: string, newUrl: string, actorId: string
   } else {
     await db.redirect.create({ data: { fromPath: oldUrl, toPath: newUrl, statusCode: 301, note: "Automatique (changement d’adresse)", createdById: actorId } });
   }
+  invalidateRedirectCache();
   await audit(actorId, "redirect.auto", { type: "Redirect" }, { fromPath: oldUrl, toPath: newUrl });
 }
 

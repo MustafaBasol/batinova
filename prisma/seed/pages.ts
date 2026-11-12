@@ -46,6 +46,38 @@ const CTA = (heading = "Un projet en tête ? Parlons-en.", href = "/devis", text
   href,
 });
 
+/** Internal cross-links between service pages and zone pages (create-if-missing seed content only). */
+const ZONES_RELATED = {
+  type: "richText",
+  doc: doc(
+    h2("Où intervenons-nous ?"),
+    p(
+      "Nous intervenons depuis notre siège d’Aulnay-sous-Bois en ",
+      link("Île-de-France", "/zones-intervention/ile-de-france"),
+      ", en ",
+      link("Normandie", "/zones-intervention/normandie"),
+      " et plus particulièrement dans le département de la ",
+      link("Manche", "/zones-intervention/manche"),
+      ".",
+    ),
+  ),
+};
+const SERVICES_RELATED = {
+  type: "richText",
+  doc: doc(
+    h2("Nos services sur ce territoire"),
+    p(
+      "Selon votre projet, découvrez notre approche de la ",
+      link("rénovation", "/services/renovation"),
+      ", de l’",
+      link("extension", "/services/extension"),
+      " ou de la ",
+      link("construction", "/services/construction"),
+      ".",
+    ),
+  ),
+};
+
 const SERVICE_NOTICE = {
   type: "placeholderNotice",
   text: "Contenu de démonstration : la liste des services proposés reste à confirmer par le propriétaire avant publication définitive.",
@@ -333,6 +365,7 @@ export async function seedPages(ctx: SeedContext): Promise<void> {
             { question: "Comment préparer ma demande de devis ?", answer: "Rassemblez quelques photos, une idée des surfaces concernées et vos priorités. Le formulaire vous guide pour transmettre l’essentiel." },
           ],
         },
+        ZONES_RELATED,
         CTA("Un projet de rénovation ?", "/devis?type=renovation"),
       ],
     },
@@ -381,6 +414,7 @@ export async function seedPages(ctx: SeedContext): Promise<void> {
             { title: "Organiser le chantier", text: "Prévoir l’accès, la protection de l’existant et l’enchaînement des interventions." },
           ],
         },
+        ZONES_RELATED,
         CTA("Un projet d’extension ?", "/devis?type=extension"),
       ],
     },
@@ -425,6 +459,7 @@ export async function seedPages(ctx: SeedContext): Promise<void> {
             { title: "Le budget global", text: "Ce qui est inclus, ce qui doit être anticipé en dehors du chantier lui-même." },
           ],
         },
+        ZONES_RELATED,
         CTA("Un projet de construction ?", "/devis?type=construction"),
       ],
     },
@@ -492,6 +527,7 @@ export async function seedPages(ctx: SeedContext): Promise<void> {
             ),
           ),
         },
+        SERVICES_RELATED,
         CTA("Un projet en Île-de-France ?", "/devis"),
       ],
     },
@@ -534,6 +570,7 @@ export async function seedPages(ctx: SeedContext): Promise<void> {
             ),
           ),
         },
+        SERVICES_RELATED,
         CTA("Un projet en Normandie ?", "/devis"),
       ],
     },
@@ -542,9 +579,9 @@ export async function seedPages(ctx: SeedContext): Promise<void> {
       title: "Manche",
       template: "ZONE",
       parentPath: "zones-intervention",
-      metaTitle: "Rénovation et construction dans la Manche (Normandie)",
+      metaTitle: "Rénovation et construction dans la Manche",
       metaDescription:
-        "Projets de rénovation, d’extension et de construction dans la Manche : bâti de pierre, littoral et bocage, organisation des chantiers depuis notre siège d’Aulnay-sous-Bois.",
+        "Projets de rénovation, d’extension et de construction dans la Manche : bâti de pierre, littoral et bocage, chantiers organisés depuis notre siège d’Aulnay-sous-Bois.",
       blocks: [
         {
           type: "hero",
@@ -576,6 +613,7 @@ export async function seedPages(ctx: SeedContext): Promise<void> {
             ),
           ),
         },
+        SERVICES_RELATED,
         CTA("Un projet dans la Manche ?", "/devis"),
       ],
     },

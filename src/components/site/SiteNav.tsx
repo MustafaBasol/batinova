@@ -109,9 +109,12 @@ export function SiteNav({ items, ctaHref, ctaLabel, logos }: { items: NavLinkIte
         </ul>
       </nav>
 
-      <Link href={ctaHref} className="btn btn-primary hidden min-[1180px]:inline-flex">
-        {ctaLabel}
-      </Link>
+      {/* Wrapper hides the CTA on mobile: the unlayered `.btn { display: inline-flex }` would beat a `hidden` utility on the link itself. */}
+      <div className="hidden min-[1180px]:block">
+        <Link href={ctaHref} className="btn btn-primary">
+          {ctaLabel}
+        </Link>
+      </div>
 
       {/* Mobile */}
       <button

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { db, resetDb } from "../support/db";
+import { recordMove } from "@/lib/cms/redirects";
 import { flushRedirectHits, invalidateRedirectCache, resolveRedirect } from "@/lib/seo/redirects";
 
 beforeEach(async () => {
@@ -21,5 +22,10 @@ describe("seo-redirects against the Redirect table", () => {
     await db.redirect.create({ data: { fromPath: "/a", toPath: "/b", statusCode: 301 } });
     await db.redirect.create({ data: { fromPath: "/b", toPath: "/a", statusCode: 301 } });
     expect(await resolveRedirect("/a")).toBeNull();
+  });
+  it("a content move (cms recordMove) is visible to the proxy cache immediately, not after the 60 s TTL", async () => {
+    expect(await resolveRedirect("/blog/avant")).toBeNull(); // primes the cache with an empty table
+    await recordMove("/blog/avant", "/blog/apres", null);
+    expect(await resolveRedirect("/blog/avant")).toEqual({ status: 301, to: "/blog/apres" });
   });
 });

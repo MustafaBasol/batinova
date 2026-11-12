@@ -59,10 +59,14 @@ export function resolveFromTable(table: ReadonlyMap<string, RedirectRow>, pathna
   return null; // chain too long
 }
 
-let cache: { at: number; table: Map<string, RedirectRow> } | null = null;
+type CacheEntry = { at: number; table: Map<string, RedirectRow> } | null;
+// Kept on globalThis: the proxy and the admin Server Actions are separate bundles of the same Node process,
+// so a module-level variable would not be shared and an admin edit could not invalidate the proxy's copy.
+const g = globalThis as unknown as { __btnvRedirectCache?: CacheEntry };
 
 async function loadTable(): Promise<Map<string, RedirectRow>> {
   const now = Date.now();
+  const cache = g.__btnvRedirectCache;
   if (cache && now - cache.at < CACHE_TTL_MS) return cache.table;
   const rows = await db.redirect.findMany({
     select: { fromPath: true, toPath: true, statusCode: true },
@@ -70,13 +74,13 @@ async function loadTable(): Promise<Map<string, RedirectRow>> {
   });
   const table = new Map<string, RedirectRow>();
   for (const r of rows) table.set(normalizeFrom(r.fromPath), r);
-  cache = { at: now, table };
+  g.__btnvRedirectCache = { at: now, table };
   return table;
 }
 
 /** Forget the cached table (tests, and callers living in the same bundle as this module). */
 export function invalidateRedirectCache(): void {
-  cache = null;
+  g.__btnvRedirectCache = null;
 }
 
 // ---- batched hit counter -------------------------------------------------

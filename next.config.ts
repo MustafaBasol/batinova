@@ -10,17 +10,34 @@ import type { NextConfig } from "next";
  * href validation, object-src 'none', base-uri/form-action 'self',
  * frame-ancestors 'none'. A nonce-based CSP (proxy.ts) is a documented
  * follow-up (forces dynamic rendering of all pages). No third-party origins are
- * allowed: analytics are disabled; enabling them later must extend this list.
+ * allowed by default; see CSP_ANALYTICS_PROVIDER below.
  */
 const isProd = process.env.NODE_ENV === "production";
 
+/**
+ * Analytics origins are added ONLY for the provider named in CSP_ANALYTICS_PROVIDER ("plausible" | "ga4"),
+ * read when the app is BUILT (headers are baked into the routes manifest). Default: none => no third-party
+ * origin is allowed. Enabling a provider therefore takes both: this env var at build time AND the admin
+ * analytics setting + visitor consent (see src/components/seo/Analytics.tsx).
+ */
+const ANALYTICS_CSP = {
+  plausible: { script: ["https://plausible.io"], connect: ["https://plausible.io"], img: [] as string[] },
+  ga4: {
+    script: ["https://www.googletagmanager.com"],
+    connect: ["https://www.google-analytics.com", "https://*.google-analytics.com", "https://*.analytics.google.com", "https://www.googletagmanager.com"],
+    img: ["https://www.google-analytics.com", "https://www.googletagmanager.com"],
+  },
+} as const;
+const analyticsCsp = ANALYTICS_CSP[process.env.CSP_ANALYTICS_PROVIDER as keyof typeof ANALYTICS_CSP] ?? { script: [], connect: [], img: [] };
+const extra = (base: string, list: readonly string[]) => [base, ...list].join(" ");
+
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isProd ? "" : " 'unsafe-eval'"}`,
+  `${extra("script-src 'self' 'unsafe-inline'", analyticsCsp.script)}${isProd ? "" : " 'unsafe-eval'"}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' blob: data:",
+  extra("img-src 'self' blob: data:", analyticsCsp.img),
   "font-src 'self'",
-  "connect-src 'self'",
+  extra("connect-src 'self'", analyticsCsp.connect),
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

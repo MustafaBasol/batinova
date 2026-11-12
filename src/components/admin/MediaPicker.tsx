@@ -104,12 +104,15 @@ export function MediaPickerDialog({ open, onClose, onPick }: { open: boolean; on
           </button>
         </div>
         <div className="grid gap-3 border-b border-charcoal/15 px-5 py-3 sm:grid-cols-[1fr_auto]">
-          <form
+          {/* Not a form element: this dialog lives inside the editors' own form element; nested forms submit natively and reload the page. */}
+          <div
             role="search"
-            onSubmit={(e) => {
-              e.preventDefault();
-              setPage(1);
-              void load(1, q, false);
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") {
+                e.preventDefault();
+                setPage(1);
+                void load(1, q, false);
+              }
             }}
             className="flex gap-2"
           >
@@ -117,10 +120,17 @@ export function MediaPickerDialog({ open, onClose, onPick }: { open: boolean; on
               Rechercher une image
             </label>
             <input id="picker-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher (texte alternatif, nom)…" className={inputCls} />
-            <button type="submit" className={btn.secondary}>
+            <button
+              type="button"
+              className={btn.secondary}
+              onClick={() => {
+                setPage(1);
+                void load(1, q, false);
+              }}
+            >
               Chercher
             </button>
-          </form>
+          </div>
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <label htmlFor="picker-alt" className="sr-only">
               Texte alternatif de la nouvelle image

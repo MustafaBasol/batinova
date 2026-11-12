@@ -37,7 +37,9 @@ export function RichTextEditor({
     editorProps: { attributes: { role: "textbox", "aria-multiline": "true", "aria-label": label, id } },
     onCreate: ({ editor: e }) => setWords(countWords(e.getText())),
     onUpdate: ({ editor: e }) => {
-      onChange(e.getJSON() as RichDoc);
+      // ProseMirror `attrs` are null-prototype objects: React encodes those as opaque temporary references ("$T") when the
+      // document is sent to a Server Action, which the server then rejects ("attrs invalides"). A JSON round-trip yields plain objects.
+      onChange(JSON.parse(JSON.stringify(e.getJSON())) as RichDoc);
       setWords(countWords(e.getText()));
     },
   });
@@ -203,6 +205,19 @@ function Toolbar({ editor }: { editor: Editor }) {
   );
 }
 
+/**
+ * Dialog contents are NOT HTML forms: they sit inside the page editor's own form element, and a nested form's native submit
+ * (observed in the production build: the submit event neither reached React nor bubbled) reloads the page and loses the draft.
+ * Buttons are type="button"; Enter in a text input applies.
+ */
+const enterApplies = (apply: () => void) => (e: React.KeyboardEvent) => {
+  const t = e.target as HTMLInputElement;
+  if (e.key === "Enter" && t.tagName === "INPUT" && t.type !== "checkbox") {
+    e.preventDefault();
+    apply();
+  }
+};
+
 function ModalDialog({ open, onClose, labelledBy, children }: { open: boolean; onClose: () => void; labelledBy: string; children: ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -232,8 +247,7 @@ function LinkForm({ editor, onClose }: { editor: Editor; onClose: () => void }) 
   const [nofollow, setNofollow] = useState(!!a.nofollow);
   const [blank, setBlank] = useState(a.target === "_blank");
   const [err, setErr] = useState<string | null>(null);
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
+  function submit() {
     let href = url.trim();
     if (/^[\w-]+(\.[\w-]+)+(\/.*)?$/.test(href)) href = `https://${href}`;
     if (!isSafeHref(href, { allowHttp: true })) return setErr("Lien non autorisé. Utilisez /page-du-site, https://…, mailto:… ou tel:….");
@@ -241,7 +255,7 @@ function LinkForm({ editor, onClose }: { editor: Editor; onClose: () => void }) 
     onClose();
   }
   return (
-    <form onSubmit={submit} className="space-y-4 p-6">
+    <div role="group" aria-labelledby="link-title" onKeyDown={enterApplies(submit)} className="space-y-4 p-6">
       <h2 id="link-title" className="font-serif text-lg">Lien</h2>
       <div>
         <label htmlFor="rt-url" className="text-sm font-medium">Adresse du lien</label>
@@ -253,9 +267,9 @@ function LinkForm({ editor, onClose }: { editor: Editor; onClose: () => void }) 
       <div className="flex flex-wrap justify-end gap-2">
         {editor.isActive("link") ? <button type="button" className={btn.danger} onClick={() => { editor.chain().focus().extendMarkRange("link").unsetMark("link").run(); onClose(); }}>Retirer le lien</button> : null}
         <button type="button" className={btn.secondary} onClick={onClose}>Annuler</button>
-        <button type="submit" className={btn.primary}>Appliquer</button>
+        <button type="button" onClick={submit} className={btn.primary}>Appliquer</button>
       </div>
-    </form>
+    </div>
   );
 }
 
@@ -271,15 +285,12 @@ function ImageDialog({ state, onClose, onSubmit }: { state: ImgState | null; onC
 function ImageForm({ initial, onClose, onSubmit }: { initial: ImgState; onClose: () => void; onSubmit: (v: ImgState) => void }) {
   const [v, setV] = useState<ImgState>(initial);
   const toast = useToast();
+  const apply = () => {
+    if (!v.alt.trim()) return toast({ kind: "error", text: "Le texte alternatif est obligatoire." });
+    onSubmit({ ...v, alt: v.alt.trim() });
+  };
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!v.alt.trim()) return toast({ kind: "error", text: "Le texte alternatif est obligatoire." });
-        onSubmit({ ...v, alt: v.alt.trim() });
-      }}
-      className="space-y-4 p-6"
-    >
+    <div role="group" aria-labelledby="img-title" onKeyDown={enterApplies(apply)} className="space-y-4 p-6">
       <h2 id="img-title" className="font-serif text-lg">Image dans le texte</h2>
       <div>
         <label htmlFor="img-alt" className="text-sm font-medium">Texte alternatif (obligatoire)</label>
@@ -298,8 +309,8 @@ function ImageForm({ initial, onClose, onSubmit }: { initial: ImgState; onClose:
       </div>
       <div className="flex justify-end gap-2">
         <button type="button" className={btn.secondary} onClick={onClose}>Annuler</button>
-        <button type="submit" className={btn.primary}>{v.pos === "insert" ? "Insérer" : "Mettre à jour"}</button>
+        <button type="button" onClick={apply} className={btn.primary}>{v.pos === "insert" ? "Insérer" : "Mettre à jour"}</button>
       </div>
-    </form>
+    </div>
   );
 }
