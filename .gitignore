@@ -1,0 +1,15 @@
+node_modules/
+.next/
+out/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+/storage/
+/prisma/*.db
+/prisma/*.db-journal
+/test-results/
+/playwright-report/
+*.tsbuildinfo
+next-env.d.ts
