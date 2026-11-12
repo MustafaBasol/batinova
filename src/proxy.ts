@@ -11,6 +11,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SITE_URL } from "@/lib/config/site";
 import { canonicalHost, isIndexingEnabled } from "@/lib/seo/indexing";
 import { GONE_HTML, resolveRedirect } from "@/lib/seo/redirects";
+import { isMissingPublicPath, NOT_FOUND_HTML } from "@/lib/seo/missing";
 
 const COOKIE_NAMES = ["__Host-btnv_session", "btnv_session"];
 
@@ -66,7 +67,26 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // 3. Everything else: continue; keep non-production deployments out of search engines.
+  // 3. Unknown public URL: answer 404 with real server-rendered HTML (Next 16.4 would send an empty error shell,
+  //    see src/lib/seo/missing.ts). Failures here must never break a request: fall through to the route.
+  if (safeMethod) {
+    let missing = false;
+    try {
+      missing = await isMissingPublicPath(pathname);
+    } catch {
+      missing = false;
+    }
+    if (missing) {
+      return withNoIndex(
+        new NextResponse(method === "HEAD" ? null : NOT_FOUND_HTML, {
+          status: 404,
+          headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+        }),
+      );
+    }
+  }
+
+  // 4. Everything else: continue; keep non-production deployments out of search engines.
   const res = NextResponse.next();
   return isIndexingEnabled() ? res : withNoIndex(res);
 }

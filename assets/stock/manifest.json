@@ -1,5 +1,5 @@
 {
-  "note": "Illustrations only. These photographs are NOT BatiNova projects and must never be presented as such. Source: Unsplash photos (CC0) as mirrored on Wikimedia Commons; the Unsplash and Pexels sites themselves block automated fetching, so the Commons file pages (verified via the MediaWiki API) are the verified source pages. originalUnsplashUrl is taken from the Commons file metadata and was not fetched directly.",
+  "note": "Illustrations only. These photographs are NOT BatiNova projects and must never be presented as such. Source: Unsplash photos (CC0) as mirrored on Wikimedia Commons; the Unsplash and Pexels sites themselves block automated fetching, so the Commons file pages (verified via the MediaWiki API) are the verified source pages. originalUnsplashUrl is taken from the Commons file metadata and was not fetched directly. Re-checked 2026-11-12 via the Commons API: all 13 file pages report CC0 (uploader-asserted). Unsplash-side licence TO VERIFY by the owner before commercial use (see docs/OWNER_CHECKLIST.md).",
   "images": [
     {
       "file": "charpente-bois-pierre-interieur-renovation.jpg",

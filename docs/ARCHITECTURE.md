@@ -216,8 +216,11 @@ analytics, lead export/hard delete/purge, permanent deletes, redirects 410.
 ## 10. Security helpers — `src/lib/security/`
 
 `rateLimit(key, limit, windowMs, now?) → {allowed, count, remaining, retryAfterMs}` (DB fixed
-window), `resetRateLimit`, `pruneRateLimitBuckets`; `getClientIp(headers)` (trusts
-X-Forwarded-For only if `TRUST_PROXY=true`), `hashIp(ip)` / `hashIdentifier(kind, v)` (HMAC
+window; serialised by the single SQLite writer, concurrency covered by tests), `resetRateLimit`,
+`pruneRateLimitBuckets`; `getClientIp(headers)` (reads forwarding headers only if
+`TRUST_PROXY=true`; uses the RIGHTMOST X-Forwarded-For entry = the one appended by our proxy,
+because the leftmost is client-controlled; non-IP values are ignored; otherwise the shared
+`unknown` bucket), `hashIp(ip)` / `hashIdentifier(kind, v)` (HMAC
 with `IP_HASH_SECRET`), `truncateUserAgent`; `assertSameOrigin(request)` / `isSameOrigin` —
 **required in mutating Route Handlers**; Server Actions are origin-checked by Next.js already;
 `audit(actorId, action, {type,id}?, summary?)` — action names `entity.verb`, summary stripped of

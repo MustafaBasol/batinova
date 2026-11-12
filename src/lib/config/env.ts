@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { assertProductionEnv } from "./production";
 
 /**
  * Server-only environment access (owner: architect-security).
@@ -39,6 +40,7 @@ export function serverEnv(): ServerEnv {
   if (parsed.data.SESSION_SECRET === parsed.data.IP_HASH_SECRET) {
     throw new Error("SESSION_SECRET and IP_HASH_SECRET must be distinct.");
   }
+  assertProductionEnv();
   cached = parsed.data;
   return cached;
 }

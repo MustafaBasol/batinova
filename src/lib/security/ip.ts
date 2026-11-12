@@ -1,5 +1,6 @@
 import "server-only";
 import { createHmac } from "node:crypto";
+import { isIP } from "node:net";
 import { serverEnv } from "@/lib/config/env";
 
 /**
@@ -11,15 +12,29 @@ import { serverEnv } from "@/lib/config/env";
  */
 export function getClientIp(headers: Headers): string {
   if (serverEnv().TRUST_PROXY === "true") {
+    // A proxy APPENDS the address it saw to any client-supplied X-Forwarded-For, so the
+    // LEFTMOST entry is attacker-controlled (rate-limit evasion by rotating fake IPs).
+    // The RIGHTMOST entry is the one added by our own proxy and is the one to trust.
     const xff = headers.get("x-forwarded-for");
     if (xff) {
-      const first = xff.split(",")[0]?.trim();
-      if (first) return first.slice(0, 64);
+      const last = xff.split(",").pop()?.trim();
+      const ip = normalizeIp(last);
+      if (ip) return ip;
     }
-    const real = headers.get("x-real-ip");
-    if (real) return real.trim().slice(0, 64);
+    const ip = normalizeIp(headers.get("x-real-ip")?.trim());
+    if (ip) return ip;
   }
   return "unknown";
+}
+
+/** Accepts only syntactically valid IPv4/IPv6 literals (strips an IPv4 port); otherwise null. */
+function normalizeIp(raw: string | undefined | null): string | null {
+  if (!raw) return null;
+  let v = raw.trim();
+  const withPort = /^(\d{1,3}(?:\.\d{1,3}){3}):\d{1,5}$/.exec(v);
+  if (withPort) v = withPort[1]!;
+  v = v.replace(/^\[(.*)\]$/, "$1");
+  return isIP(v) ? v.toLowerCase() : null;
 }
 
 export function hashIp(ip: string): string {

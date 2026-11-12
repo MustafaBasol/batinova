@@ -28,6 +28,7 @@ const env = {
   PRIVATE_STORAGE_DIR: `./.tmp/${process.env.E2E_DIR ?? "e2e"}/private`,
   SITE_URL: process.env.E2E_SITE_URL ?? "https://btnv.fr", // production value: canonical/OG/sitemap are asserted against it (the server itself still listens on localhost)
   SITE_INDEXING: "true",
+  ALLOW_EPHEMERAL_PATHS: "true", // local E2E only: relative .tmp paths / possible http SITE_URL
   TRUST_PROXY: "true", // lets each test pick its own X-Forwarded-For => isolated rate-limit buckets
   SMTP_HOST: "", SMTP_USER: "", SMTP_PASSWORD: "", MAIL_FROM: "",
 };

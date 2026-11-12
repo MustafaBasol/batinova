@@ -12,6 +12,7 @@ import { z } from "zod";
 import { audit } from "@/lib/security/audit";
 import { getClientIp } from "@/lib/security/ip";
 import { GENERIC_LOGIN_ERROR, attemptLogin } from "./login";
+import { safeNext } from "./redirect";
 import { revokeSessionToken, sessionCookieName, sessionCookieOptions, validateSessionToken } from "./session";
 
 export interface LoginFormState {
@@ -23,14 +24,6 @@ const LoginSchema = z.object({
   password: z.string().max(256),
   next: z.string().max(512).optional(),
 });
-
-/** Only same-site admin paths are accepted as post-login destinations. */
-function safeNext(next: string | undefined): string {
-  if (!next) return "/admin";
-  if (!/^\/admin(?:\/[A-Za-z0-9\-_/]*)?(?:\?[A-Za-z0-9\-_=&]*)?$/.test(next)) return "/admin";
-  if (next.startsWith("/admin/login")) return "/admin";
-  return next;
-}
 
 export async function loginAction(_prev: LoginFormState, formData: FormData): Promise<LoginFormState> {
   const parsed = LoginSchema.safeParse({

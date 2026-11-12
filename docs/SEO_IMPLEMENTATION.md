@@ -94,3 +94,10 @@ A new zone/location page may be created only if ALL are true:
 - [ ] no invented address, branch, phone, map, opening hours, review or rating.
 
 Never: generating pages per commune/department from a list, "rénovation + <ville>" templates, keyword-stuffed city lists, fake local branches, duplicated paragraphs. Departments or cities other than the three core areas are mentioned in running text only when a real project there exists and the owner approves.
+
+## Articles initiaux : publication (seed et script opt-in)
+
+- Nouvelles installations : `npm run db:seed` crée les 3 articles initiaux au statut PUBLISHED avec une date `publishedAt` fixe (2026-10-05, 2026-10-12, 2026-10-19), uniquement si le slug n'existe pas (create-if-missing). Le seed ne modifie jamais une ligne existante, ne restaure pas la corbeille et ne republie rien.
+- Bases existantes où les 3 articles sont encore des brouillons : `npm run content:publish-initial` (opt-in, jamais lancé par le seed). Un article n'est publié que s'il est un brouillon vierge : non supprimé, `updatedAt = createdAt`, aucune révision, aucun `updatedById`, titre inchangé. Tout article modifié, planifié, déjà publié ou en corbeille est ignoré et listé dans la sortie. Sauvegardez la base avant exécution.
+- Couvertures : photos libres de droits (Unsplash), médias marqués `isPlaceholder`, ALT descriptif neutre sans prétendre à un chantier BatiNova.
+- Tests : `tests/integration/seo-seed-articles.test.ts` (statut, listing, catégories, sitemap, idempotence, script opt-in, hygiène du contenu), `tests/integration/seo-proxy.test.ts` (www vers apex, 301, 410, noindex).

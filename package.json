@@ -21,6 +21,7 @@
     "db:seed": "prisma db seed",
     "db:reset": "node scripts/guard-dev.mjs && prisma migrate reset",
     "admin:create": "tsx --conditions=react-server scripts/create-admin.ts",
+    "content:publish-initial": "tsx --conditions=react-server prisma/seed/publish-initial-articles.ts",
     "maintenance:purge": "tsx --conditions=react-server scripts/purge-expired.ts",
     "test:e2e": "playwright test"
   },

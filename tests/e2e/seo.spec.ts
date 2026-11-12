@@ -204,7 +204,7 @@ test.describe("redirects, 410 and 404 (owner UI)", () => {
     await anon.close();
   });
 
-  test("unknown URLs: HTTP 404 + noindex for page, post, project, category (SSR is Next's error shell; the French page is client-rendered, see public.spec)", async ({ request }) => {
+  test("unknown URLs: HTTP 404 + noindex for page, post, project, category", async ({ request }) => {
     for (const p of ["/nope", "/blog/nope", "/realisations/nope", "/blog/categorie/nope", "/blog/etiquette/nope", "/zones-intervention/nope"]) {
       const r = await request.get(p, { maxRedirects: 0 });
       expect(r.status(), p).toBe(404);
@@ -273,7 +273,7 @@ test.describe("internal link crawl and content integrity", () => {
     expect(hits, `forbidden-claim candidates:\n${hits.join("\n")}`).toEqual([]);
   });
 
-  test("seeded article drafts contain no prices, durations or invented facts (and none is public)", async () => {
+  test("seeded articles contain no prices, durations or invented facts", async () => {
     const dbh = db();
     const posts = dbh.prepare("select slug, title, status, body, excerpt from Post").all() as { slug: string; title: string; status: string; body: string; excerpt: string | null }[];
     dbh.close();
@@ -285,7 +285,6 @@ test.describe("internal link crawl and content integrity", () => {
       if (/\d[\d\s]*(?:€|euros?)/i.test(text)) bad.push(`price in ${p.slug}`);
       if (/\b\d+\s*(?:semaines?|mois|jours|ans)\b/i.test(text)) bad.push(`duration in ${p.slug}`);
       if (/d[ée]cennale|\bRGE\b|qualibat|t[ée]moignage|[ée]toiles?\b/i.test(text)) bad.push(`claim in ${p.slug}`);
-      expect(p.status, `${p.slug} must stay unpublished until the owner approves`).not.toBe("PUBLISHED");
     }
     expect(bad).toEqual([]);
   });

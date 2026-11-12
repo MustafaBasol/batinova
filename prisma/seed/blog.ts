@@ -1,5 +1,7 @@
 // Blog seed (seo-content). CREATE-IF-MISSING ONLY: match by slug, never overwrite owner edits, never restore
-// soft-deleted rows. Seeded posts are ordinary editable posts (status DRAFT: the owner reviews and publishes).
+// soft-deleted rows. Seeded posts are ordinary editable posts, created PUBLISHED with a fixed publishedAt on
+// NEW installs only. Existing databases (where the same articles were seeded as DRAFT) are never touched by the
+// seed; see prisma/seed/publish-initial-articles.ts for the explicit, opt-in, unmodified-only publication.
 //
 // Editorial rules (docs/CONTENT_REQUIREMENTS.md): original French copy, neutral expert voice, NO figures
 // (prices, durations, percentages), NO regulatory thresholds stated as fact, NO guarantees, NO invented
@@ -70,7 +72,11 @@ interface SeedPost {
   cover: string; // stock file name
   build: (ids: { bodyImage?: string }) => unknown;
   bodyImageFile?: string;
+  /** Fixed publication date (ISO, UTC): never derived from the seed run time. */
+  publishedAt: string;
 }
+
+export const INITIAL_ARTICLE_SLUGS = [SLUG_1, SLUG_2, SLUG_3] as const;
 
 const POSTS: SeedPost[] = [
   {
@@ -83,6 +89,7 @@ const POSTS: SeedPost[] = [
       "Clarifier ses besoins, faire le point sur le bâti, cadrer le budget, vérifier les démarches, comparer les devis puis organiser le chantier : un fil conducteur en sept étapes pour aborder une rénovation dans le bon ordre.",
     category: "conseils-renovation",
     tags: ["renovation", "planification", "chantier", "autorisations"],
+    publishedAt: "2026-10-05T08:00:00.000Z",
     cover: "fenetre-bois-facade-brique-ancienne.jpg",
     bodyImageFile: "echafaudage-filet-vert-facade-chantier.jpg",
     build: ({ bodyImage }) =>
@@ -184,6 +191,7 @@ const POSTS: SeedPost[] = [
       "Quel usage pour l’espace créé, que permet le terrain, comment raccorder le neuf à l’existant, quelles autorisations vérifier, quel budget prévoir : les questions essentielles avant d’agrandir une maison.",
     category: "construction",
     tags: ["extension", "planification", "autorisations"],
+    publishedAt: "2026-10-12T08:00:00.000Z",
     cover: "maison-bois-contemporaine-crepuscule.jpg",
     build: () =>
       doc(
@@ -259,11 +267,12 @@ const POSTS: SeedPost[] = [
     title: "Planifier son budget travaux : les postes à anticiper",
     metaTitle: "Budget travaux : les postes à anticiper",
     metaDescription:
-      "Études, démarches, travaux, équipements, imprévus, financement : les postes à anticiper pour construire un budget travaux réaliste et sans mauvaise surprise.",
+      "Études, démarches, travaux, équipements, imprévus, financement : les postes à anticiper pour construire un budget travaux réaliste.",
     excerpt:
-      "Un budget travaux ne se limite pas au prix du chantier. Études, démarches, équipements, frais annexes, imprévus et suivi : la liste des postes à anticiper, sans aucun chiffre trompeur.",
+      "Un budget travaux ne se limite pas au prix du chantier. Études, démarches, équipements, frais annexes, imprévus et suivi : la liste des postes à anticiper, sans chiffres avancés à la légère.",
     category: "budget-travaux",
     tags: ["budget", "planification", "chantier"],
+    publishedAt: "2026-10-19T08:00:00.000Z",
     cover: "plans-architecte-compas-table.jpg",
     build: () =>
       doc(
@@ -331,11 +340,18 @@ const POSTS: SeedPost[] = [
   },
 ];
 
+export const INITIAL_ARTICLES = POSTS.map((x) => ({ slug: x.slug, title: x.title, publishedAt: x.publishedAt }));
+
 // ---------------------------------------------------------------- seed
 
 export async function seedBlog(ctx: SeedContext): Promise<void> {
-  const { db, log } = ctx;
   await seedMedia(ctx); // idempotent: matches by originalName, reuses the Media rows created for the pages
+  await seedBlogPosts(ctx);
+}
+
+/** Categories, tags and the initial articles (create-if-missing by slug). Exported for tests (no media pipeline). */
+export async function seedBlogPosts(ctx: SeedContext): Promise<void> {
+  const { db, log } = ctx;
 
   let created = 0;
   const catIds = new Map<string, string>();
@@ -370,7 +386,8 @@ export async function seedBlog(ctx: SeedContext): Promise<void> {
         coverImageId: coverId ?? null,
         categoryId: catIds.get(post.category) ?? null,
         authorDisplayName: "L’équipe BatiNova",
-        status: "DRAFT",
+        status: "PUBLISHED",
+        publishedAt: new Date(post.publishedAt),
         readingMinutes: estimateReadingMinutes(checked.doc),
         isPlaceholder: false, // real editorial copy; only the cover image is an illustration
         metaTitle: post.metaTitle,
@@ -379,7 +396,7 @@ export async function seedBlog(ctx: SeedContext): Promise<void> {
       },
     });
     created++;
-    log(`blog: "${post.slug}" created as DRAFT (${countWords(richTextToPlainText(checked.doc))} words)`);
+    log(`blog: "${post.slug}" created as PUBLISHED (${countWords(richTextToPlainText(checked.doc))} words)`);
   }
   log(`blog: ${created} article(s) created, categories/tags ensured`);
 }

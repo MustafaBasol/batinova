@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { audit } from "@/lib/security/audit";
 import { getSettings } from "@/lib/settings";
-import { getPrivateStorage } from "@/lib/storage";
+import { InvalidStorageKeyError, getPrivateStorage } from "@/lib/storage";
 
 /**
  * Lead lifecycle & retention (owner: architect-security). See docs/ARCHITECTURE.md §Leads.
@@ -36,10 +36,28 @@ export async function purgeExpiredLeads(now: Date = new Date(), actorId: string 
     take: 500,
   });
   const storage = getPrivateStorage();
+  let purged = 0;
+  let deferred = 0;
   for (const lead of expired) {
-    for (const a of lead.attachments) await storage.delete(a.storageKey).catch(() => undefined);
+    // Files first. If a file cannot be removed (I/O error) keep the row so the next run retries,
+    // otherwise the file would be orphaned forever with no DB reference left to find it.
+    // A malformed key can never be resolved on disk, so it must not block the purge.
+    let filesGone = true;
+    for (const a of lead.attachments) {
+      try {
+        await storage.delete(a.storageKey);
+      } catch (err) {
+        if (!(err instanceof InvalidStorageKeyError)) filesGone = false;
+      }
+    }
+    if (!filesGone) {
+      deferred++;
+      continue;
+    }
     await db.lead.delete({ where: { id: lead.id } });
+    purged++;
   }
-  if (expired.length) await audit(actorId, "lead.purge", { type: "Lead" }, { count: expired.length });
-  return expired.length;
+  if (deferred) console.error(`[retention] ${deferred} lead(s) deferred: attachment file could not be deleted`);
+  if (purged) await audit(actorId, "lead.purge", { type: "Lead" }, { count: purged, deferred });
+  return purged;
 }

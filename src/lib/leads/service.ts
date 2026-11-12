@@ -98,6 +98,7 @@ export async function submitLead(
 
   const retentionUntil = new Date(now.getTime() + settings.leads.retentionDays * 24 * 60 * 60 * 1000);
   let leadId: string;
+  let createdLeadId: string | null = null;
   const storedKeys: string[] = [];
   try {
     const lead = await db.lead.create({
@@ -123,6 +124,7 @@ export async function submitLead(
       },
     });
     leadId = lead.id;
+    createdLeadId = lead.id;
     const storage = getPrivateStorage();
     for (const a of accepted) {
       const ext = EXTENSION_BY_MIME[a.mime] ?? "bin";
@@ -142,11 +144,21 @@ export async function submitLead(
     }
   } catch (err) {
     console.error("[lead] save failed", err instanceof Error ? err.name : "error");
+    // All-or-nothing: the visitor is told to retry, so do not leave a half-saved lead (duplicate on retry)
+    // nor orphaned private files behind.
+    const storage = getPrivateStorage();
+    for (const key of storedKeys) await storage.delete(key).catch(() => undefined);
+    if (createdLeadId) await db.lead.deleteMany({ where: { id: createdLeadId } }).catch(() => undefined);
     return { ok: false, error: GENERIC_ERROR };
   }
 
   await audit(null, "lead.create", { type: "Lead", id: leadId }, { attachments: storedKeys.length });
-  await deliverLeadNotification(leadId);
+  try {
+    await deliverLeadNotification(leadId);
+  } catch (err) {
+    // The lead is already stored: a notification problem must never surface as a failed submission.
+    console.error("[lead] notification failed", err instanceof Error ? err.name : "error");
+  }
   return { ok: true, leadId };
 }
 

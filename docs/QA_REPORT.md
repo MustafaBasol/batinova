@@ -1,24 +1,28 @@
-# BatiNova — QA / release-gate report (Phase 5)
+# BatiNova — QA / release-gate report (pre-PR hardening 001)
 
-Date of run: 2026-11-12. Branch `feature/batinova-initial-development`. Nothing was deployed, pushed or opened as a PR.
-Only results actually produced by the commands below are reported; anything not run is marked NOT RUN / NOT MEASURED.
+Date of run: 2026-11-12. Branch `feature/batinova-initial-development`. Nothing was deployed; no DNS/mailbox/production change.
+Only results actually produced by the commands below are reported.
 
 ## 1. Verdict
 
-Code-level: READY_FOR_PR after the fixes listed in section 4 (they are uncommitted in the working tree; the coordinator commits).
-Owner-content blockers (legal identity, placeholders, phone, SMTP, DNS…) are expected and listed in `docs/OWNER_CHECKLIST.md`.
-They block going live, not the PR.
+Code-level: REVIEW_REQUIRED (owner review of editorial copy, image licence confirmation and legal data; GitHub CI result is recorded in the PR).
+Owner-content blockers (legal identity, placeholders, phone, SMTP, DNS…) are listed in `docs/OWNER_CHECKLIST.md`; they block going live, not the PR.
 
 ## 2. Exact commands and results (run one at a time, final run)
 
 | Command | Result |
 |---|---|
-| `npm run typecheck` | PASS (exit 0) |
-| `npm run lint` | PASS (exit 0; `.tmp/**` added to ESLint ignores) |
-| `npm test` (Vitest, 2 workers) | PASS: 17 files, 229 tests (228 existing + 1 new redirect-cache test) |
-| `npm run build` | PASS (exit 0). All routes dynamic except icons/manifest |
-| `npm run test:e2e` (Playwright 1.65, Chromium headless shell, production build on port 3500) | PASS: 92 tests, 1 worker, about 2.5 min plus about 45 s server boot |
+| `npm run typecheck` | PASS |
+| `npm run lint` | PASS |
+| `npx vitest run --maxWorkers=2` | PASS: 21 files, 264 tests |
+| `npm run build` | PASS |
+| `npx playwright test` (production build, port 3500) | PASS: 98 tests |
 | `npm audit --omit=dev` | 0 vulnerabilities |
+
+Changes in this pass: server-rendered 404 (see R1), 3 initial articles PUBLISHED by seed + opt-in script for untouched drafts,
+security hardening (rightmost X-Forwarded-For, production env fail-fast, lead/attachment failure handling, purge keeps leads whose files
+cannot be deleted, early attachment size check, login redirect helper), image licence records (13 stock images: CC0 per Wikimedia Commons;
+Unsplash-side licence still TO VERIFY by owner), CI workflow `.github/workflows/ci.yml`.
 
 E2E harness: `playwright.config.ts` + `tests/e2e/start-server.mjs` (Playwright `webServer.command`). It wipes and recreates `.tmp/e2e`
 (gitignored), runs `prisma migrate deploy` on an empty SQLite file, runs the seed, creates OWNER / EDITOR / lockout users with random
@@ -43,7 +47,7 @@ Spec files: `tests/e2e/public.spec.ts`, `a11y.spec.ts`, `quote.spec.ts`, `admin.
 | WCAG | Manual screen-reader pass, zoom/reflow, reduced-motion visual check | n/a | NOT RUN | Automated axe covers only part of WCAG |
 | Reduced motion | `prefers-reduced-motion` block exists in `globals.css` | code read | PASS (not visually tested) | `src/app/globals.css` |
 | Links | Same-origin crawl from `/` + sitemap (about 20 pages), all `a[href]` and `<img src>`: all 200 | Playwright (APIRequest) | PASS | `seo.spec.ts` crawl test. No link to a draft/unpublished post or to a missing page |
-| 404 | Status 404 + noindex for unknown page/post/project/category/tag; French 404 page, `lang=fr`, H1, home link after hydration | Playwright | PASS with caveat | See risk R1 (the raw server HTML is Next's error shell without `lang`) |
+| 404 | Status 404 + noindex for unknown page/post/project/category/tag; French 404 page, `lang=fr`, H1, home link after hydration | Playwright | PASS | Server HTML is real French 404 (see R1) |
 | French copy | `lang=fr`, French labels/errors on all flows exercised | Playwright | PASS (spot checks, no copy audit) | all specs |
 | Quote | Per-step validation, consent required, success screen, lead visible in /admin inbox, no PII in URL | Playwright | PASS | `quote.spec.ts` |
 | Quote | Honeypot: success screen shown, lead NOT stored | Playwright | PASS | `quote.spec.ts` |
@@ -71,7 +75,7 @@ Spec files: `tests/e2e/public.spec.ts`, `a11y.spec.ts`, `quote.spec.ts`, `admin.
 | Indexing gate | Placeholder pages (home, services, legal…) are noindex even with `SITE_INDEXING=true` | Playwright + DB | PASS | `seo.spec.ts`. Consequence: site stays noindex until the owner clears the flags |
 | JSON-LD | Valid JSON; no rating/review/telephone/priceRange/foundingDate/geo/offers/opening hours; one address = 4 rue des Lilas, 93600 Aulnay-sous-Bois, FR; `areaServed` only Île-de-France, Normandie, Manche; no `Service` node while service copy is placeholder; BlogPosting headline equals post title | Playwright | PASS | `seo.spec.ts`. `serializeJsonLd` escapes `< > & U+2028/9` (unit tests existing) |
 | Content integrity | Visible copy of all crawled pages scanned for phone numbers, SIREN/SIRET/TVA/RCS values, décennale, years of experience, ratings/testimonials/"avis", certification claims, prices | Playwright regex | PASS (0 hits) | `seo.spec.ts`. Regex scan only; names of clients/projects cannot be regex-checked, review manually |
-| Content integrity | 3 seeded articles: no prices, durations, décennale, RGE, testimonials; all DRAFT | DB read | PASS | `seo.spec.ts` |
+| Content integrity | 3 seeded articles: no prices, durations, décennale, RGE, testimonials; now PUBLISHED | DB read | PASS | `seo.spec.ts` |
 | Placeholders | « Contenu de démonstration » shown on services; legal pages show `[À compléter par le propriétaire]` and noindex; address formatted `4 rue des Lilas` / `93600 Aulnay-sous-Bois` | Playwright | PASS | `seo.spec.ts`. NOTE: nothing technically blocks a production deploy while placeholders remain (see R4) |
 | Internal linking | Service pages link to all 3 zone pages and zone pages link to all 3 services | Playwright | PASS (after fix 6) | `seo.spec.ts`; applies to freshly seeded DBs only |
 | Privacy defaults | Home + /devis: zero third-party requests, no cookie, no localStorage/sessionStorage, no consent banner; CSP has no analytics origin | Playwright | PASS | `seo.spec.ts` |
@@ -124,10 +128,12 @@ the stock images are already 2400 px wide sources).
 
 ## 6. Remaining risks (ordered)
 
-- R1 (medium, platform): with Next 16.4.6 any `notFound()` is answered 404 with Next's minimal error shell
-  (`<html id="__next_error__">`, empty body, no `lang`); the French 404 page is rendered client-side after hydration (verified in a
-  browser: `lang=fr`, content, axe clean). Status 404 and noindex are correct. A no-JS client sees a blank page. Reproduced with a trivial page,
-  with the default `not-found`, and without `proxy.ts`, so it is not caused by project code. Mitigation options: accept, or serve 404s from a custom handler later.
+- R1 (RESOLVED, platform): Next 16.4.6 answers a `notFound()` thrown by a dynamic page with an EMPTY error shell
+  (`<html id="__next_error__">`, hard-coded in `app-render` `getErrorRSCPayload`; reproduced with a trivial page, the default and a segment-level
+  `not-found`; no config option; 16.4.6 is the latest release). Fix: `src/proxy.ts` asks `src/lib/seo/missing.ts` (same `publishedWhere` rule as the routes)
+  and answers unknown page/blog/category/tag/project URLs with 404 + `X-Robots-Tag: noindex` + a static French HTML page (lang=fr, H1, home link).
+  Routes keep `notFound()` as fallback. Tests: `tests/integration/seo-404-proxy.test.ts`, no-JS E2E in `public.spec.ts`. Residual: pages that still call
+  `notFound()` without a proxy match (e.g. `/devis/xyz`, race with unpublishing) keep the old client-rendered 404.
 - R2 (medium, ops): `TRUST_PROXY=false` puts every visitor in one IP bucket: 5 quote requests/hour and 20 login attempts/15 min for the whole site.
   Production must set `TRUST_PROXY=true` behind a proxy that overwrites `X-Forwarded-For` (in the owner checklist).
 - R3 (low): no font preload hints; LCP text may flash with the fallback font (`swap`, size-adjusted fallbacks exist). Not measured.

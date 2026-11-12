@@ -43,6 +43,23 @@ test.describe("404 page", () => {
   });
 });
 
+test.describe("404 page without JavaScript", () => {
+  test.use({ javaScriptEnabled: false });
+  for (const path of ["/cette-page-n-existe-pas", "/blog/article-inexistant", "/blog/categorie/inexistante", "/blog/etiquette/inexistante", "/realisations/inexistant", "/services/inexistant"]) {
+    test(`server HTML of ${path}: 404, noindex, French message, link home`, async ({ page, request }) => {
+      const res = await request.get(path);
+      expect(res.status()).toBe(404);
+      expect(res.headers()["x-robots-tag"]).toContain("noindex");
+      const html = await res.text();
+      expect(html).toContain('<html lang="fr">');
+      expect(html).not.toContain("__next_error__");
+      await page.goto(path);
+      await expect(page.locator("h1")).toHaveText("Cette page est introuvable.");
+      await expect(page.getByRole("link", { name: /Retour à l’accueil/ })).toHaveAttribute("href", "/");
+    });
+  }
+});
+
 test.describe("mobile menu keyboard", () => {
   test.use({ viewport: { width: 360, height: 740 } });
   test("open, focus inside, Tab trap, Esc closes and returns focus", async ({ page }) => {

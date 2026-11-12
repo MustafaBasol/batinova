@@ -46,7 +46,20 @@ SQLite.
 - `SESSION_SECRET`, `IP_HASH_SECRET`: distinct ≥32-char random values from the platform's
   secret store. Rotating `SESSION_SECRET` logs out all admins; rotating `IP_HASH_SECRET`
   resets rate-limit identities.
-- `TRUST_PROXY=true` only behind a proxy that overwrites `X-Forwarded-For`.
+- `TRUST_PROXY=true` only behind a proxy that sets/appends `X-Forwarded-For` and is the ONLY way
+  to reach the app (bind the app to localhost / a private network; otherwise clients can spoof the
+  header and evade rate limits). The app uses the rightmost entry (single trusted proxy hop).
+  Default `false`: all IP-based limits share one bucket (e-mail limits still apply).
+- **Fail-fast**: when `NODE_ENV=production`, `src/instrumentation.ts` (at `next start`, not at build)
+  and `serverEnv()` refuse to run with missing/short/placeholder/duplicate secrets, a missing or
+  non-https `SITE_URL`, a non-`file:` or relative `DATABASE_URL`, or relative/missing storage paths
+  (`src/lib/config/production.ts`). `ALLOW_EPHEMERAL_PATHS=true` disables the path/https rules for
+  local production-mode runs (E2E) ONLY — never set it on a real deployment.
+- **Single instance**: SQLite + local-disk storage + DB rate limits assume exactly one app process
+  (the retention cron is a second short-lived process that briefly shares the DB file; run it off-peak. WAL mode is not explicitly enabled — verify before relying on concurrent writers). Do not scale out
+  or use platform "zero-downtime overlap" deploys without moving to PostgreSQL + object storage (§5).
+- Reverse proxy must terminate TLS, redirect http→https, forward `Host`, and limit request bodies to
+  ~25 MB (the app caps uploads at 15 MB media / 4 MB per attachment).
 - Deploy steps: `npm ci` → `npm run build` → `npm run db:deploy` → `npm run start`
   (HTTPS required: session cookie is `__Host-` + Secure in production).
 - Mail stays off until: mailbox exists, MX/SPF/DKIM/DMARC verified, `SMTP_*` + `MAIL_FROM` set,
@@ -61,6 +74,19 @@ SQLite.
 - Media and private dirs: daily incremental sync (e.g. restic/rclone) to encrypted off-site storage.
 - Scheduled retention purge: see "Retention purge cron" below.
 - Restoring a backup can resurrect purged leads: re-run the purge after any restore.
+- Restore procedure: stop the app → keep the broken DB aside → copy the chosen backup to
+  `DATABASE_URL`'s path (remove stale `-wal`/`-shm` files) → restore media/private dirs from the same
+  date → `npm run db:deploy` (applies any newer migrations) → start → `npm run maintenance:purge`
+  → check /admin/login and a media URL. DB and media must come from the same backup point, otherwise
+  Media rows may reference missing files.
+- Migrations: only `prisma migrate deploy` in production (never `migrate dev`/`reset`); take a DB
+  backup immediately before each deploy that adds a migration.
+- Purge failure behaviour: if a lead's private attachment cannot be deleted (I/O error) the lead row
+  is kept and retried at the next run, so no file is orphaned; the CLI prints counts only. Alert on a
+  non-zero exit code / missing daily log line.
+- Mail: Hostinger SMTP is configured purely through `SMTP_HOST/PORT/SECURE/USER/PASSWORD` + `MAIL_FROM`
+  (see `.env.example`) and the OWNER setting. A mail failure never loses a lead: the record is saved
+  first and `mailDeliveryState`/`lastMailError` (credentials stripped) are updated; use « renvoyer ».
 
 ### Retention purge cron (GDPR) — REQUIRED in production
 
