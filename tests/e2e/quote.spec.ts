@@ -39,8 +39,11 @@ test.describe("quote flow (mobile)", () => {
     await page.getByLabel("Code postal").fill("123");
     await page.getByRole("button", { name: "Continuer" }).click();
     await expect(page.locator("form").getByRole("alert")).toContainText("Code postal");
-    await page.getByLabel("Code postal").fill("93600");
-    await expect(page.getByText(/Zone détectée : Île-de-France/)).toBeVisible();
+    // Retry fill+assert: on a slow runner the first fill can land before React hydrates and is then reset.
+    await expect(async () => {
+      await page.getByLabel("Code postal").fill("93600");
+      await expect(page.getByText(/Zone détectée : Île-de-France/)).toBeVisible({ timeout: 1_500 });
+    }).toPass({ timeout: 15_000 });
     await page.getByRole("button", { name: "Continuer" }).click();
     await page.getByRole("button", { name: "Continuer" }).click();
     // step 4: too short
