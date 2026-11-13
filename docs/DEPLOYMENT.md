@@ -115,6 +115,12 @@ non-canonical origin. Messages name variables, never values.
 > sees the environment variables must be measured with `npm run deploy:probe` in a test deployment (`docs/HOSTINGER_PERSISTENCE_TEST.md` §D)
 > before `build:hostinger` is trusted. Fallbacks are described below.
 
+> **Production-only installs.** Hostinger may install with `--omit=dev` (first deploy failed with `tsx: command not found`). Everything
+> `build:hostinger` and the ops scripts need (`prisma`, `tsx`, `mariadb`, `typescript`, `tailwindcss`, `@tailwindcss/postcss`, `@types/*`) is
+> therefore in `dependencies`; `next build` type-checks with `tsconfig.build.json` (no tests). CI job `prod-install` guards this
+> (`npm ci --omit=dev && node scripts/verify-prod-deps.mjs && npx next build`). Re-runs are safe: migrations are advisory-locked, the seed is create-if-missing and
+> the owner bootstrap is a no-op once an OWNER exists; a failure before `next build` aborts the deploy and the previous version keeps serving.
+
 Build command to configure in Hostinger (Build Settings): **`npm run build:hostinger`**
 (= `prisma generate` → `npm run deploy:setup` → `next build`); start command stays `npm run start`.
 
