@@ -1,11 +1,15 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { SiteShell } from "@/components/site/SiteShell";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Page introuvable", robots: { index: false, follow: true } };
 
-export default function NotFound() {
+// connection(): force request-time rendering. `export const dynamic` is not honoured when the webpack build prerenders
+// /_global-error from this boundary, which would query the database (no DATABASE_URL guarantee) during `next build`.
+export default async function NotFound() {
+  await connection();
   return (
     <SiteShell>
       <section className="wrap section">

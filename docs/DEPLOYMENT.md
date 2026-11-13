@@ -122,7 +122,18 @@ non-canonical origin. Messages name variables, never values.
 > the owner bootstrap is a no-op once an OWNER exists; a failure before `next build` aborts the deploy and the previous version keeps serving.
 
 Build command to configure in Hostinger (Build Settings): **`npm run build:hostinger`**
-(= `prisma generate` → `npm run deploy:setup` → `next build`); start command stays `npm run start`.
+(= `prisma generate` → `npm run deploy:setup` → `npm run build:webpack` = `next build --webpack`); start command stays `npm run start`.
+
+**Why Webpack.** The first Hostinger deployment (Node 24, Next.js 16.4.6) passed `deploy:setup` but `next build` (Turbopack) died in
+the CSS step: `TurbopackInternalError … evaluate_webpack_loader failed … node process exited before we could connect`
+(Turbopack evaluates PostCSS in a separate Node child process, which the managed build host did not allow to start). The same
+code builds with Turbopack locally, so this is host-specific; `next build --webpack` runs PostCSS in-process. Evidence level: Webpack
+build verified locally and in CI; **not yet verified on Hostinger**. `npm run build` (Turbopack) stays for local/CI use.
+`src/app/not-found.tsx` calls `connection()` so `/_global-error` is never prerendered with database access.
+
+**After a successful first OWNER creation (already done for this site): delete `BOOTSTRAP_OWNER_EMAIL`, `BOOTSTRAP_OWNER_NAME` and
+`BOOTSTRAP_OWNER_PASSWORD_HASH` from the Hostinger environment.** Redeploys do not need them: the bootstrap is a no-op once any
+OWNER exists (it only logs a warning while the variables linger).
 
 `deploy:setup` (idempotent, safe on every deployment):
 1. pre-flight `SELECT 1`; **database unreachable → exit 1 → the build fails, nothing is changed and Hostinger keeps the live

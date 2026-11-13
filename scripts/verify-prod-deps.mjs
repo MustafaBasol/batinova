@@ -14,6 +14,11 @@ for (const name of required) {
   if (!pkg.dependencies?.[name]) fail(`${name} must be in "dependencies" (not devDependencies)`);
   if (!existsSync(`node_modules/${name}/package.json`)) fail(`${name} is not installed after --omit=dev`);
 }
+// build:hostinger contract: prisma generate -> deploy:setup -> webpack build (Turbopack's PostCSS worker crashed on Hostinger)
+const bh = pkg.scripts?.["build:hostinger"] ?? "";
+const order = ["prisma generate", "npm run deploy:setup", "npm run build:webpack"].map((t) => bh.indexOf(t));
+if (order.some((i) => i < 0) || order.some((v, i) => i > 0 && v <= order[i - 1])) fail('"build:hostinger" must run: prisma generate && npm run deploy:setup && npm run build:webpack');
+if (!/next build --webpack/.test(pkg.scripts?.["build:webpack"] ?? "")) fail('"build:webpack" must be "next build --webpack"');
 // every npm script that shells out to tsx/prisma must resolve to a production dependency
 for (const [script, cmd] of Object.entries(pkg.scripts ?? {})) {
   for (const bin of ["tsx", "prisma", "next"]) {
