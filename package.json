@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
-    "build:hostinger": "prisma generate && npm run deploy:setup && next build",
+    "build:webpack": "next build --webpack",
+    "build:hostinger": "prisma generate && npm run deploy:setup && npm run build:webpack",
     "deploy:setup": "tsx --conditions=react-server scripts/deploy-setup.ts",
     "db:status": "prisma migrate status",
     "deploy:probe": "tsx --conditions=react-server scripts/deploy-probe.ts",

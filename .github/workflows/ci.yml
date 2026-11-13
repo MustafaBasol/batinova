@@ -62,7 +62,9 @@ jobs:
       - run: node scripts/verify-prod-deps.mjs
         env:
           NODE_ENV: production
-      - run: npx next build
+      # Same bundler as build:hostinger (Turbopack's PostCSS worker crashed on the Hostinger host). No DATABASE_URL on purpose:
+      # the build must not need a database.
+      - run: npm run build:webpack
         env:
           NODE_ENV: production
           SITE_URL: https://btnv.fr
